@@ -1,0 +1,1428 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agenda 2SAY</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --grafite:#003349;
+  --limao:#BFE53A;
+  --nevoa:#F2F6F8;
+  --branco:#FFFFFF;
+  --linha:#D3E0E6;
+  --linha-forte:#A9C2CC;
+  --cinza:#4A6672;
+  --cinza-claro:#7D97A3;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{
+  font-family:'Schibsted Grotesk',system-ui,sans-serif;
+  background:var(--nevoa);
+  color:var(--grafite);
+  font-size:14px;
+  line-height:1.5;
+}
+h1,h2,h3,h4{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:400;letter-spacing:-.01em}
+.eyebrow{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--cinza-claro);
+}
+button{font-family:inherit;font-size:inherit;color:inherit;border:0;background:none;cursor:pointer}
+input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
+[hidden]{display:none !important}
+
+/* ---------- portão ---------- */
+.gate{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
+.gate-caixa{max-width:430px;width:100%}
+.gate-marca{background:var(--grafite);border-radius:6px 6px 0 0;padding:20px 22px}
+.gate-marca h1{color:var(--branco);font-size:19px}
+.gate-marca span{
+  font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--limao)
+}
+.gate-corpo{background:var(--branco);border:1px solid var(--linha);border-top:0;border-radius:0 0 6px 6px;padding:22px}
+.gate-corpo p{font-size:13px;color:var(--cinza);line-height:1.55;margin-bottom:16px}
+
+/* ---------- topo ---------- */
+.topbar{
+  background:var(--grafite);color:var(--nevoa);padding:14px 22px;display:flex;align-items:center;
+  gap:18px;flex-wrap:wrap;position:sticky;top:0;z-index:60;
+}
+.brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
+.brand h1{font-size:16px;color:var(--branco)}
+.brand .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--limao);font-family:'JetBrains Mono',monospace}
+.wknav{display:flex;align-items:center;gap:2px;background:rgba(255,255,255,.08);border-radius:4px;padding:2px}
+.wknav button{padding:5px 9px;color:var(--nevoa);border-radius:3px;line-height:1}
+.wknav button:hover{background:rgba(255,255,255,.12)}
+.wknav .wklabel{font-family:'JetBrains Mono',monospace;font-size:11px;padding:5px 10px;white-space:nowrap;color:var(--branco)}
+.tabs{display:flex;gap:2px;background:rgba(255,255,255,.08);border-radius:4px;padding:2px}
+.tabs button{padding:6px 13px;border-radius:3px;font-size:12px;font-weight:500;color:rgba(226,238,243,.7)}
+.tabs button.on{background:var(--limao);color:var(--grafite);font-weight:600}
+.syncpill{
+  display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  padding:5px 10px;border:1px solid rgba(255,255,255,.2);border-radius:20px;color:rgba(226,238,243,.75);cursor:pointer
+}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--cinza-claro);flex:none}
+.dot.ok{background:var(--limao)}
+.dot.busy{background:#E68A00}
+.dot.err{background:#FF5C5C}
+.btn-ghost{border:1px solid rgba(255,255,255,.2);border-radius:4px;padding:6px 12px;font-size:12px;color:var(--nevoa)}
+.btn-ghost:hover{border-color:var(--limao);color:var(--limao)}
+
+/* ---------- layout ---------- */
+.wrap{display:grid;grid-template-columns:296px 1fr;gap:0;align-items:start}
+.guia{
+  position:sticky;top:57px;height:calc(100vh - 57px);overflow-y:auto;
+  border-right:1px solid var(--linha);background:var(--branco);padding:20px 18px 40px
+}
+.mesa{padding:22px 24px 80px;min-width:0}
+
+/* ---------- guia ---------- */
+.guia h2{font-size:13px;margin-bottom:3px}
+.guia .arq{border:1px solid var(--linha);border-radius:5px;padding:12px 13px;margin-bottom:18px;background:var(--nevoa)}
+.guia .arq p{font-size:12px;color:var(--cinza);margin-top:5px;line-height:1.45}
+.nivel{margin-bottom:16px}
+.nivel-head{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.nivel-head .tag{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;
+  padding:3px 7px;border-radius:3px;color:var(--branco)
+}
+.nivel-head .foco{font-size:10px;color:var(--cinza-claro);font-family:'JetBrains Mono',monospace}
+.quadro{
+  border:1px solid var(--linha);border-left:3px solid var(--linha-forte);
+  border-radius:4px;padding:8px 10px;margin-bottom:5px;background:var(--branco)
+}
+.quadro strong{display:block;font-size:12.5px;font-weight:600;line-height:1.3}
+.quadro span{display:block;font-size:11px;color:var(--cinza);margin-top:2px;line-height:1.35}
+.quadro .canais{display:flex;gap:5px;margin-top:5px;flex-wrap:wrap}
+.chip{
+  font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.04em;
+  border:1px solid var(--linha-forte);border-radius:3px;padding:2px 5px;color:var(--cinza)
+}
+.regra{border-top:1px solid var(--linha);padding-top:14px;margin-top:6px}
+.regra ol{margin:7px 0 0 15px;font-size:12px;color:var(--cinza);line-height:1.7}
+.metricas{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px;align-items:center}
+.metricas .m{font-size:10.5px;font-family:'JetBrains Mono',monospace;color:var(--cinza)}
+.metricas .seta{color:var(--linha-forte);font-size:10px}
+.metricas .m.top{color:var(--grafite);font-weight:500}
+
+/* ---------- semana ---------- */
+.mesa-head{display:flex;align-items:flex-end;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.mesa-head h2{font-size:19px}
+.mesa-head .sub{font-size:12px;color:var(--cinza)}
+.placar{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.placar .p{border:1px solid var(--linha);background:var(--branco);border-radius:4px;padding:6px 10px;text-align:center;min-width:64px}
+.placar .p b{display:block;font-family:'Bricolage Grotesque',sans-serif;font-size:16px;line-height:1.1}
+.placar .p b i{font-style:normal;font-size:11px;color:var(--cinza-claro)}
+.placar .p span{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza-claro)}
+
+.semana{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
+.dia{background:var(--branco);border:1px solid var(--linha);border-radius:5px;display:flex;flex-direction:column;min-width:0}
+.dia.hoje{border-color:var(--grafite)}
+.dia-head{padding:8px 9px;border-bottom:1px solid var(--linha);display:flex;align-items:baseline;gap:5px}
+.dia-head b{font-size:11.5px;font-weight:600;text-transform:capitalize}
+.dia-head .num{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cinza-claro);margin-left:auto}
+.dia.hoje .dia-head b::after{
+  content:'hoje';font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.08em;text-transform:uppercase;
+  background:var(--limao);color:var(--grafite);padding:2px 4px;border-radius:2px;margin-left:5px;font-weight:500
+}
+.slots{padding:7px;display:flex;flex-direction:column;gap:6px;flex:1;min-height:70px}
+.slot{
+  border:1px solid var(--linha-forte);background:var(--nevoa);border-radius:4px;padding:7px 8px;cursor:grab;
+  display:flex;flex-direction:column;gap:3px;transition:border-color .12s, opacity .12s, box-shadow .12s
+}
+.slot:hover{border-color:var(--grafite)}
+.slot.arrastando{opacity:.35;cursor:grabbing}
+.slot .nivel-tag{
+  font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;
+  display:flex;align-items:center;gap:4px
+}
+.slot .nivel-tag i{width:5px;height:5px;border-radius:50%;flex:none;font-style:normal}
+.slot .quadro-nome{font-size:10px;color:var(--cinza);font-weight:500}
+.slot .tema{font-size:11.5px;font-weight:600;line-height:1.3;word-break:break-word}
+.slot .slot-foot{margin-top:auto;display:flex;align-items:center;gap:4px;flex-wrap:wrap;padding-top:4px}
+.add-card{
+  border:1px dashed var(--linha-forte);border-radius:4px;padding:6px;text-align:center;
+  color:var(--cinza-claro);font-size:12px;line-height:1;transition:border-color .12s,color .12s
+}
+.add-card:hover{border-color:var(--grafite);color:var(--grafite)}
+.dia-foot{display:flex;gap:5px}
+.dia-foot .add-card{flex:1}
+.dia-foot .add-story{flex:none;width:34px;display:flex;align-items:center;justify-content:center;gap:2px}
+.story{
+  display:flex;align-items:center;gap:6px;padding:4px 7px;border:1px solid var(--linha);
+  border-radius:3px;font-size:10.5px;line-height:1.3;cursor:grab;background:var(--branco);
+  transition:border-color .12s,opacity .12s
+}
+.story:hover{border-color:var(--grafite)}
+.story.arrastando{opacity:.35}
+.ring{
+  width:9px;height:9px;border-radius:50%;border:1.5px solid var(--cinza-claro);flex:none;
+  display:inline-block
+}
+.story.feito{color:var(--cinza-claro)}
+.story.feito .story-txt{text-decoration:line-through}
+.story.feito .ring{border-color:var(--limao);background:var(--limao)}
+.story .story-txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.stories-sep{
+  font-family:'JetBrains Mono',monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--cinza-claro);margin-top:2px
+}
+.dia.drop-alvo{border-color:var(--grafite);box-shadow:0 0 0 1px var(--grafite)}
+.slot.ghost{
+  position:fixed;z-index:300;pointer-events:none;background:var(--branco);
+  box-shadow:0 8px 24px rgba(26,26,26,.25);transform:rotate(1.5deg);opacity:.96
+}
+.st{
+  font-family:'JetBrains Mono',monospace;font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 5px;border-radius:2px;border:1px solid var(--linha-forte);color:var(--cinza)
+}
+.st.publicado{background:var(--grafite);color:var(--limao);border-color:var(--grafite)}
+.st.gravar{background:var(--limao);border-color:var(--limao);color:var(--grafite)}
+.slot .alc{font-size:9px;color:var(--grafite);font-family:'JetBrains Mono',monospace;border:1px solid var(--grafite);border-radius:2px;padding:1px 4px}
+
+/* ---------- banco ---------- */
+.toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.btn{background:var(--grafite);color:var(--branco);border-radius:4px;padding:8px 14px;font-size:12.5px;font-weight:500}
+.btn:hover{background:#000}
+.btn.lima{background:var(--limao);color:var(--grafite);font-weight:600}
+.btn.lima:hover{background:#a8de00}
+.btn.linha{background:none;border:1px solid var(--linha-forte);color:var(--grafite)}
+.btn.linha:hover{border-color:var(--grafite)}
+.lista{display:flex;flex-direction:column;gap:7px}
+.ideia{background:var(--branco);border:1px solid var(--linha);border-radius:5px;padding:11px 13px;display:flex;gap:12px;align-items:flex-start}
+.ideia .corpo{flex:1;min-width:0}
+.ideia .tema{font-size:13.5px;font-weight:600;line-height:1.35}
+.ideia .hook{font-size:12px;color:var(--cinza);margin-top:3px;font-style:italic;line-height:1.4}
+.ideia .meta{display:flex;gap:5px;margin-top:7px;flex-wrap:wrap}
+.ideia .acoes{display:flex;gap:5px;flex:none}
+.ic{border:1px solid var(--linha-forte);border-radius:3px;padding:4px 8px;font-size:11px;color:var(--cinza)}
+.ic:hover{border-color:var(--grafite);color:var(--grafite)}
+.vazio-msg{border:1px dashed var(--linha-forte);border-radius:5px;padding:26px;text-align:center;color:var(--cinza-claro);font-size:13px}
+
+/* ---------- histórico ---------- */
+table{width:100%;border-collapse:collapse;background:var(--branco);border:1px solid var(--linha);border-radius:5px}
+th{
+  text-align:left;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;
+  color:var(--cinza-claro);padding:9px 11px;border-bottom:1px solid var(--linha);font-weight:400
+}
+td{padding:9px 11px;border-bottom:1px solid var(--linha);font-size:12.5px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
+.abandono{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:7px;margin-bottom:22px}
+.ab{background:var(--branco);border:1px solid var(--linha);border-radius:4px;padding:10px 12px}
+.ab b{display:block;font-size:12.5px;font-weight:600}
+.ab .barra{height:4px;background:var(--nevoa);border-radius:2px;margin-top:7px;overflow:hidden}
+.ab .barra i{display:block;height:100%;background:var(--limao)}
+.ab .c{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--cinza);margin-top:5px;display:block}
+.ab.frio{border-color:#E8C4C4}
+.ab.frio .barra i{background:#FF8A8A}
+
+/* ---------- editor ---------- */
+.overlay{position:fixed;inset:0;background:rgba(26,26,26,.42);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px}
+.editor{background:var(--branco);border-radius:6px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto}
+.editor-head{background:var(--grafite);color:var(--branco);padding:14px 18px;display:flex;align-items:center;gap:10px}
+.editor-head h3{font-size:14px;flex:1}
+.editor-head .foco{font-family:'JetBrains Mono',monospace;font-size:10px}
+.editor-head .fechar{color:var(--nevoa);font-size:18px;line-height:1;padding:0 4px}
+.editor-body{padding:18px}
+.campo{margin-bottom:14px}
+.campo > label{
+  display:block;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--cinza-claro);margin-bottom:5px
+}
+.campo input,.campo textarea,.campo select{
+  width:100%;border:1px solid var(--linha-forte);border-radius:4px;padding:9px 11px;background:var(--branco);font-size:13px
+}
+.campo input:focus,.campo textarea:focus,.campo select:focus{outline:0;border-color:var(--grafite)}
+.campo textarea{resize:vertical;min-height:56px;line-height:1.45}
+.campo .dica{font-size:11px;color:var(--cinza-claro);margin-top:5px;line-height:1.4}
+.linha2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.radios{display:flex;gap:5px;flex-wrap:wrap}
+.radios label{
+  border:1px solid var(--linha-forte);border-radius:4px;padding:6px 11px;font-size:12px;cursor:pointer;
+  font-family:'Schibsted Grotesk',sans-serif;letter-spacing:0;text-transform:none;color:var(--grafite);margin:0
+}
+.radios input{display:none}
+.radios label:has(input:checked){background:var(--grafite);color:var(--branco);border-color:var(--grafite)}
+.editor-foot{padding:14px 18px;border-top:1px solid var(--linha);display:flex;gap:8px;align-items:center}
+.editor-foot .btn-del{margin-left:auto;color:#C2185B;font-size:12px}
+.campo label.checkline{
+  display:flex;align-items:center;gap:8px;cursor:pointer;
+  border:1px solid var(--linha-forte);border-radius:4px;padding:9px 11px;margin:0;
+  font-family:'Schibsted Grotesk',sans-serif;font-size:12.5px;letter-spacing:0;text-transform:none;color:var(--grafite)
+}
+.campo label.checkline:has(input:checked){border-color:var(--grafite);background:var(--nevoa);font-weight:500}
+.checkline input{width:auto}
+
+.toast{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--grafite);color:var(--branco);
+  padding:11px 20px;border-radius:5px;font-size:12.5px;z-index:200;opacity:0;pointer-events:none;transition:opacity .18s
+}
+.toast.on{opacity:1}
+
+.rodape{
+  background:var(--grafite);color:rgba(226,238,243,.55);padding:16px 24px;font-size:11px;
+  font-family:'JetBrains Mono',monospace;display:flex;gap:14px;flex-wrap:wrap;align-items:center
+}
+.rodape b{color:var(--limao);font-weight:400}
+
+@media(max-width:1080px){
+  .wrap{display:flex;flex-direction:column}
+  .mesa{order:1;padding:18px 14px 40px}
+  .guia{order:2;position:static;height:auto;border-right:0;border-top:1px solid var(--linha);padding-top:22px}
+  .semana{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:560px){
+  .semana{grid-template-columns:1fr}
+  .brand{width:100%}
+  .topbar{padding:12px 14px;gap:10px}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= PORTÃO ================= -->
+<div class="gate" id="gate" hidden>
+  <div class="gate-caixa">
+    <div class="gate-marca">
+      <h1>Sistema</h1>
+      <span id="gateSub">conteúdo privado</span>
+    </div>
+    <div class="gate-corpo">
+      <p id="gateTexto">
+        Esta página é só a interface. Todo o conteúdo fica num repositório privado seu.
+        Conecte para carregar o seu sistema.
+      </p>
+      <button class="btn lima" id="gateBtn">Conectar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= APLICAÇÃO ================= -->
+<div id="app" hidden>
+
+  <div class="topbar">
+    <div class="brand">
+      <h1 id="marcaTitulo">Sistema</h1>
+      <span class="sub" id="marcaSub"></span>
+    </div>
+
+    <div class="wknav" id="wknav">
+      <button id="wkPrev" title="Semana anterior">&larr;</button>
+      <span class="wklabel" id="wkLabel">semana</span>
+      <button id="wkNext" title="Próxima semana">&rarr;</button>
+      <button id="wkHoje" title="Voltar para a semana atual">hoje</button>
+    </div>
+
+    <div class="tabs">
+      <button data-aba="semana" class="on">Semana</button>
+      <button data-aba="banco">Ideias</button>
+      <button data-aba="historico">Histórico</button>
+    </div>
+
+    <button class="btn-ghost" id="btnBriefing">Briefing</button>
+    <div class="syncpill" id="syncPill" title="Configurar a sincronização">
+      <span class="dot" id="syncDot"></span><span id="syncTxt">local</span>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <aside class="guia" id="guia"></aside>
+
+    <main class="mesa">
+      <section id="abaSemana">
+        <div class="mesa-head">
+          <div>
+            <span class="eyebrow">Planejamento</span>
+            <h2>A semana</h2>
+            <p class="sub" id="subSemana"></p>
+          </div>
+          <div class="placar" id="placar"></div>
+        </div>
+        <div class="semana" id="grade"></div>
+      </section>
+
+      <section id="abaBanco" hidden>
+        <div class="mesa-head">
+          <div>
+            <span class="eyebrow">Matéria-prima</span>
+            <h2>Banco de ideias</h2>
+            <p class="sub">O que ainda não tem dia. Jogue aqui na hora que a ideia aparecer, decida depois.</p>
+          </div>
+        </div>
+        <div class="toolbar">
+          <button class="btn lima" id="btnNovaIdeia">+ Nova ideia</button>
+          <button class="btn linha" id="btnCopiarBanco">Copiar banco</button>
+        </div>
+        <div class="lista" id="listaIdeias"></div>
+      </section>
+
+      <section id="abaHistorico" hidden>
+        <div class="mesa-head">
+          <div>
+            <span class="eyebrow">Memória</span>
+            <h2>Histórico</h2>
+            <p class="sub">O que já saiu, e quais quadros você anda abandonando.</p>
+          </div>
+        </div>
+        <span class="eyebrow">Uso dos quadros nas últimas 8 semanas</span>
+        <div class="abandono" id="abandono" style="margin-top:9px"></div>
+        <span class="eyebrow">Publicados</span>
+        <div style="margin-top:9px"><table id="tabelaPublicados"></table></div>
+      </section>
+    </main>
+  </div>
+
+  <div class="rodape">
+    <span>desobedeça o óbvio</span>
+    <span>·</span>
+    <span id="rodapeSalvo">salvo neste navegador</span>
+    <span style="margin-left:auto"><b id="rodapeContagem"></b></span>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   Casca. Nenhum conteúdo mora aqui: tudo vem do sistema.json
+   guardado no repositório privado.
+   ========================================================= */
+const CHAVE = '2say-sistema-v1';
+const CHAVE_GH = '2say-gh';
+const DIAS = ['seg','ter','qua','qui','sex','sab','dom'];
+const DIAS_LONGO = {seg:'segunda',ter:'terça',qua:'quarta',qui:'quinta',sex:'sexta',sab:'sábado',dom:'domingo'};
+const STATUS = ['ideia','gravar','editar','publicado'];
+
+let S = null;
+let semanaAtual = null;
+let abaAtual = 'semana';
+let pendente = false;
+const agora = () => new Date().toISOString();
+
+/* ---- atalhos para o conteúdo ---- */
+const G = () => (S && S.guia) || {};
+const QUADROS = () => G().quadros || [];
+const NIVEIS = () => G().niveis || {};
+const NKEYS = () => Object.keys(NIVEIS());
+const qById = id => QUADROS().find(q => q.id === id);
+const temConteudo = () => !!(S && S.guia && (S.guia.quadros||[]).length);
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* =========================================================
+   Semana ISO
+   ========================================================= */
+function isoSemana(d){
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dn = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dn);
+  const ini = new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  const num = Math.ceil((((t - ini) / 86400000) + 1) / 7);
+  return t.getUTCFullYear() + '-W' + String(num).padStart(2,'0');
+}
+function segundaDa(chave){
+  const [ano, w] = chave.split('-W').map(Number);
+  const q = new Date(Date.UTC(ano,0,4));
+  const dn = q.getUTCDay() || 7;
+  const seg1 = new Date(q); seg1.setUTCDate(q.getUTCDate() - dn + 1);
+  const seg = new Date(seg1); seg.setUTCDate(seg1.getUTCDate() + (w-1)*7);
+  return seg;
+}
+function deslocaSemana(chave, n){
+  const seg = segundaDa(chave);
+  seg.setUTCDate(seg.getUTCDate() + n*7);
+  return isoSemana(new Date(seg.getUTCFullYear(), seg.getUTCMonth(), seg.getUTCDate()));
+}
+function datasDaSemana(chave){
+  const seg = segundaDa(chave);
+  return DIAS.map((_,i) => { const d = new Date(seg); d.setUTCDate(seg.getUTCDate()+i); return d; });
+}
+const fmtDia = d => String(d.getUTCDate()).padStart(2,'0') + '/' + String(d.getUTCMonth()+1).padStart(2,'0');
+const isoDe = d => d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+function hojeISO(){ const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+
+function semana(chave){
+  if(!S.semanas[chave]) S.semanas[chave] = {dias:{}, nota:''};
+  const w = S.semanas[chave];
+  DIAS.forEach(d => { if(!w.dias[d]) w.dias[d] = []; });
+  return w;
+}
+
+/* Dá identidade aos cards antigos (1 slot por nível). O id é derivado da
+   posição original, então dois aparelhos migram para o MESMO id e o merge
+   não duplica nada. */
+function migra(sist){
+  if(!sist) return sist;
+  sist.removidos = sist.removidos || {};
+  sist.removidos.slots = sist.removidos.slots || {};
+  sist.removidos.ideias = sist.removidos.ideias || {};
+  sist.removidos.cards = sist.removidos.cards || {};
+  Object.keys(sist.semanas||{}).forEach(wk => {
+    const w = sist.semanas[wk];
+    Object.keys(w.dias||{}).forEach(dia => {
+      (w.dias[dia]||[]).forEach(c => {
+        if(!c.id) c.id = 'L' + wk + '|' + dia + '|' + (c.nivel||'x');
+      });
+    });
+  });
+  // remoções antigas (por slot) viram remoções do card legado equivalente
+  Object.keys(sist.removidos.slots).forEach(k => {
+    const id = 'L' + k;
+    if(!sist.removidos.cards[id] || sist.removidos.cards[id] < sist.removidos.slots[k])
+      sist.removidos.cards[id] = sist.removidos.slots[k];
+  });
+  return sist;
+}
+
+const achaCard = id => {
+  for(const wk of Object.keys(S.semanas||{})){
+    const w = S.semanas[wk];
+    for(const dia of Object.keys(w.dias||{})){
+      const i = (w.dias[dia]||[]).findIndex(c => c.id === id);
+      if(i >= 0) return {wk, dia, i, card:w.dias[dia][i]};
+    }
+  }
+  return null;
+};
+
+function gravaCard(chave, dia, id, dados){
+  S.removidos = migra(S).removidos;
+  if(dados === null){
+    const pos = achaCard(id);
+    if(pos) S.semanas[pos.wk].dias[pos.dia].splice(pos.i, 1);
+    S.removidos.cards[id] = agora();
+    salvar();
+    return;
+  }
+  const arr = semana(chave).dias[dia];
+  const i = arr.findIndex(c => c.id === id);
+  delete S.removidos.cards[id];
+  const novo = {...(i>=0 ? arr[i] : {id}), ...dados, mod:agora()};
+  if(i>=0) arr[i] = novo; else arr.push(novo);
+  salvar();
+}
+
+function moveCard(id, paraWk, paraDia, antesDeId){
+  const pos = achaCard(id);
+  if(!pos) return;
+  const [c] = S.semanas[pos.wk].dias[pos.dia].splice(pos.i, 1);
+  c.mod = agora();
+  const alvo = semana(paraWk).dias[paraDia];
+  let idx = antesDeId ? alvo.findIndex(x => x.id === antesDeId) : -1;
+  if(idx < 0) alvo.push(c); else alvo.splice(idx, 0, c);
+  salvar();
+}
+
+/* Une o que está aqui com o que está no repositório, sem que um lado
+   apague o outro. Resolve card a card pelo carimbo de modificação: o lado
+   com o mod mais novo vence, inclusive na POSIÇÃO (semana e dia) do card. */
+function mesclar(local, remoto){
+  if(!remoto || remoto.novo || !remoto.guia) return migra(local);
+  if(!local || !local.guia) return migra(remoto);
+  migra(local); migra(remoto);
+
+  const tL = local.atualizadoEm || '';
+  const tR = remoto.atualizadoEm || '';
+  const rL = local.removidos || {}, rR = remoto.removidos || {};
+  const rem = {
+    slots:  {...(rR.slots||{}),  ...(rL.slots||{})},
+    ideias: {...(rR.ideias||{}), ...(rL.ideias||{})},
+    cards:  {...(rR.cards||{}),  ...(rL.cards||{})}
+  };
+
+  const out = JSON.parse(JSON.stringify(remoto));
+  // o guia mais novo é a base, mas quadros e canais ADICIONADOS do outro
+  // lado nunca se perdem: um navegador com guia velho não desfaz a adição
+  const gBase = (tL > tR && local.guia) ? local.guia : remoto.guia;
+  const gOutro = gBase === local.guia ? remoto.guia : local.guia;
+  out.guia = JSON.parse(JSON.stringify(gBase));
+  ((gOutro && gOutro.quadros) || []).forEach(q => {
+    const meus = out.guia.quadros = out.guia.quadros || [];
+    const j = meus.findIndex(x => x.id === q.id);
+    if(j < 0){ meus.push(JSON.parse(JSON.stringify(q))); return; }
+    (q.canais||[]).forEach(c => {
+      meus[j].canais = meus[j].canais || [];
+      if(!meus[j].canais.includes(c)) meus[j].canais.push(c);
+    });
+  });
+
+  // coleta todos os cards dos dois lados, com posição e ordem
+  const coleta = (sist, fallback) => {
+    const m = {};
+    Object.keys(sist.semanas||{}).forEach(wk => {
+      Object.keys(sist.semanas[wk].dias||{}).forEach(dia => {
+        (sist.semanas[wk].dias[dia]||[]).forEach((c, i) => {
+          m[c.id] = {card:c, wk, dia, i, mod:c.mod || fallback};
+        });
+      });
+    });
+    return m;
+  };
+  const R = coleta(remoto, tR), L = coleta(local, tL);
+  const ids = new Set([...Object.keys(R), ...Object.keys(L)]);
+
+  out.semanas = {};
+  const notas = {};
+  [remoto, local].forEach(s => Object.keys(s.semanas||{}).forEach(wk => {
+    if(s.semanas[wk].nota) notas[wk] = s.semanas[wk].nota;
+  }));
+
+  ids.forEach(id => {
+    const r = R[id], l = L[id];
+    const win = (l && r) ? ((l.mod||'') >= (r.mod||'') ? l : r) : (l || r);
+    if(rem.cards[id] && (win.card.mod||'') < rem.cards[id]) return; // apagado depois da última edição
+    if(!out.semanas[win.wk]) out.semanas[win.wk] = {dias:{}, nota:notas[win.wk]||''};
+    const w = out.semanas[win.wk];
+    if(!w.dias[win.dia]) w.dias[win.dia] = [];
+    w.dias[win.dia].push({...win.card, _ord:win.i});
+  });
+  Object.values(out.semanas).forEach(w => Object.keys(w.dias).forEach(d => {
+    w.dias[d].sort((a,b) => (a._ord||0) - (b._ord||0));
+    w.dias[d].forEach(c => delete c._ord);
+  }));
+  Object.keys(notas).forEach(wk => {
+    if(!out.semanas[wk]) out.semanas[wk] = {dias:{}, nota:notas[wk]};
+  });
+
+  const mapa = {};
+  (remoto.ideias||[]).forEach(x => mapa[x.id] = x);
+  (local.ideias||[]).forEach(x => {
+    const a = mapa[x.id];
+    if(!a || (x.mod||x.criadoEm||'') >= (a.mod||a.criadoEm||'')) mapa[x.id] = x;
+  });
+  Object.keys(rem.ideias).forEach(id => {
+    const x = mapa[id];
+    if(x && (x.mod||x.criadoEm||'') < rem.ideias[id]) delete mapa[id];
+  });
+  out.ideias = Object.values(mapa).sort((a,b) => (b.criadoEm||'').localeCompare(a.criadoEm||''));
+
+  const pmap = {};
+  [...(remoto.publicados||[]), ...(local.publicados||[])].forEach(p => pmap[(p.data||'')+'|'+(p.tema||'')] = p);
+  out.publicados = Object.values(pmap);
+
+  out.removidos = rem;
+  out.atualizadoEm = tL > tR ? tL : tR;
+  return out;
+}
+
+/* =========================================================
+   Persistência
+   ========================================================= */
+let syncTimer = null;
+
+function salvar(){
+  S.atualizadoEm = agora();
+  try{ localStorage.setItem(CHAVE, JSON.stringify(S)); }catch(e){}
+  render();
+  if(gh.ligado()){
+    pendente = true;
+    clearTimeout(syncTimer);
+    marcaSync('busy','não enviado');
+    syncTimer = setTimeout(() => gh.enviar(), 800);
+  }
+}
+
+/* Se a aba for fechada ou escondida com envio pendente, manda na hora.
+   keepalive faz a requisição sobreviver ao fechamento da página. */
+function descarregar(){
+  if(pendente && gh.ligado()){ clearTimeout(syncTimer); gh.enviar(); }
+}
+function carregarLocal(){
+  try{
+    const raw = localStorage.getItem(CHAVE);
+    S = raw ? JSON.parse(raw) : null;
+  }catch(e){ S = null; }
+  if(S){
+    S.semanas = S.semanas || {};
+    S.ideias = S.ideias || [];
+    S.publicados = S.publicados || [];
+    migra(S);
+  }
+}
+
+const gh = {
+  cfg(){ try{ return JSON.parse(localStorage.getItem(CHAVE_GH)||'null'); }catch(e){ return null; } },
+  ligado(){ const c = this.cfg(); return !!(c && c.token && c.repo); },
+  sha:null,
+  url(){ const c = this.cfg(); return `https://api.github.com/repos/${c.repo}/contents/${c.arquivo||'sistema.json'}`; },
+  async ler(){
+    const c = this.cfg(); if(!c) return null;
+    const r = await fetch(this.url() + '?t=' + Date.now(),
+      {headers:{Authorization:`Bearer ${c.token}`, Accept:'application/vnd.github+json'}, cache:'no-store'});
+    if(r.status === 404) return {novo:true};
+    if(r.status === 401 || r.status === 403) throw new Error('token sem acesso');
+    if(!r.ok) throw new Error('leitura ' + r.status);
+    const j = await r.json();
+    this.sha = j.sha;
+    const txt = new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,'')), ch => ch.charCodeAt(0)));
+    return JSON.parse(txt);
+  },
+  async enviar(retentativa){
+    const c = this.cfg(); if(!c) return;
+    try{
+      marcaSync('busy','enviando');
+      // Traz o que houver de novo no repositório e mistura antes de gravar,
+      // para nunca apagar o que foi escrito do outro lado.
+      let remoto = null;
+      try{ remoto = await this.ler(); }catch(e){}
+      if(remoto && !remoto.novo && remoto.guia){
+        S = mesclar(S, remoto);
+        try{ localStorage.setItem(CHAVE, JSON.stringify(S)); }catch(e){}
+        renderTudo();
+      }
+      const bytes = new TextEncoder().encode(JSON.stringify(S,null,2));
+      let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
+      const body = {message:'sistema: ' + agora(), content:btoa(bin)};
+      if(this.sha) body.sha = this.sha;
+      const r = await fetch(this.url(), {
+        method:'PUT', keepalive:true,
+        headers:{Authorization:`Bearer ${c.token}`, Accept:'application/vnd.github+json'},
+        body:JSON.stringify(body)
+      });
+      if(r.status === 409 && !retentativa){ this.sha = null; return this.enviar(true); }
+      if(r.status === 403) throw new Error('token sem escrita');
+      if(!r.ok) throw new Error('envio ' + r.status);
+      const j = await r.json();
+      this.sha = j.content.sha;
+      pendente = false;
+      marcaSync('ok','sincronizado');
+    }catch(e){ marcaSync('err', e.message); }
+  },
+  async puxar(){
+    marcaSync('busy','buscando');
+    const remoto = await this.ler();
+    if(remoto && !remoto.novo && remoto.guia){
+      const antes = JSON.stringify(S);
+      S = mesclar(S, remoto);
+      S.semanas = S.semanas || {}; S.ideias = S.ideias || []; S.publicados = S.publicados || [];
+      try{ localStorage.setItem(CHAVE, JSON.stringify(S)); }catch(e){}
+      return JSON.stringify(S) !== antes;
+    }
+    return false;
+  }
+};
+
+function marcaSync(estado, txt){
+  const d = document.getElementById('syncDot');
+  if(!d) return;
+  d.className = 'dot ' + (estado||'');
+  document.getElementById('syncTxt').textContent = txt || 'local';
+  const rodape = estado === 'ok'  ? 'sincronizado no GitHub'
+               : estado === 'err' ? 'falhou ao enviar, o texto está salvo neste navegador'
+               : pendente         ? 'alterações ainda não enviadas'
+               : gh.ligado()      ? 'verificando' : 'salvo neste navegador';
+  document.getElementById('rodapeSalvo').textContent = rodape;
+}
+
+/* =========================================================
+   Render
+   ========================================================= */
+function render(){
+  if(!temConteudo()) return;
+  renderPlacar();
+  if(abaAtual === 'semana') renderSemana();
+  if(abaAtual === 'banco') renderBanco();
+  if(abaAtual === 'historico') renderHistorico();
+  const flat = Object.values(S.semanas).flatMap(w => Object.values(w.dias||{}).flat());
+  const n = flat.filter(c => c.tipo !== 'story').length;
+  const ns = flat.filter(c => c.tipo === 'story').length;
+  document.getElementById('rodapeContagem').textContent =
+    n + ' posts planejados · ' + (ns ? ns + ' stories · ' : '') + S.ideias.length + ' ideias no banco';
+}
+
+function renderMarca(){
+  document.getElementById('marcaTitulo').textContent = G().titulo || 'Agenda 2SAY';
+  document.getElementById('marcaSub').textContent = G().subtitulo || '';
+  document.title = (G().titulo || 'Agenda 2SAY') + (G().subtitulo ? ' · ' + G().subtitulo : '');
+}
+
+function renderGuia(){
+  const g = G();
+  const arq = g.arquetipo || {};
+  const blocos = (g.blocos||[]).map(b => `
+    <div class="regra">
+      <span class="eyebrow">${esc(b.eyebrow||'')}</span>
+      ${b.titulo ? `<h2 style="margin-top:2px">${esc(b.titulo)}</h2>` : ''}
+      <ol>${(b.itens||[]).map(i => `<li>${esc(i)}</li>`).join('')}</ol>
+    </div>`).join('');
+
+  const mets = (g.metricas||[]);
+  const metricas = mets.length ? `
+    <div class="regra">
+      <span class="eyebrow">Métrica, nesta ordem</span>
+      <div class="metricas">
+        ${mets.map((m,i) => `<span class="m${m.forte?' top':''}">${esc(m.nome)}</span>` +
+          (i < mets.length-1 ? '<span class="seta">&gt;</span>' : '')).join('')}
+      </div>
+    </div>` : '';
+
+  document.getElementById('guia').innerHTML = `
+    ${arq.titulo ? `<div class="arq">
+      <span class="eyebrow">Arquétipo</span>
+      <h2>${esc(arq.titulo)}</h2>
+      <p>${esc(arq.texto||'')}</p>
+    </div>` : ''}
+    <span class="eyebrow">O funil</span>
+    <div style="margin-top:8px">
+      ${NKEYS().map(nv => {
+        const cfg = NIVEIS()[nv];
+        return `<div class="nivel">
+          <div class="nivel-head">
+            <span class="tag" style="background:${cfg.cor}">${esc(cfg.nome)}</span>
+            <span class="foco">${esc(cfg.foco||'')}</span>
+          </div>
+          ${QUADROS().filter(q => q.nivel === nv).map(q => `
+            <div class="quadro" style="border-left-color:${cfg.cor}">
+              <strong>${esc(q.nome)}</strong>
+              <span>${esc(q.desc||'')}</span>
+              <div class="canais">
+                ${q.formato ? `<span class="chip">${esc(q.formato)}</span>` : ''}
+                ${(q.canais||[]).map(c => `<span class="chip">${esc(c)}</span>`).join('')}
+              </div>
+            </div>`).join('')}
+        </div>`;
+      }).join('')}
+    </div>
+    ${blocos}
+    ${metricas}`;
+}
+
+function renderPlacar(){
+  const flat = Object.values(semana(semanaAtual).dias).flat();
+  const todos = flat.filter(s => s.tipo !== 'story');
+  const stories = flat.filter(s => s.tipo === 'story');
+  const cont = nv => todos.filter(s => s.nivel === nv && s.tema).length;
+  const cel = (v,total,rot) =>
+    `<div class="p"><b>${v}${total?`<i>/${total}</i>`:''}</b><span>${rot}</span></div>`;
+  document.getElementById('placar').innerHTML =
+    NKEYS().map(nv => cel(cont(nv), 7, NIVEIS()[nv].nome)).join('') +
+    cel(todos.filter(s => s.alcance && s.tema).length, 7, 'alcance') +
+    cel(todos.filter(s => s.status === 'publicado').length, 0, 'publicados') +
+    (stories.length ? cel(stories.filter(s => s.feito).length, stories.length, 'stories') : '');
+}
+
+function renderSemana(){
+  const datas = datasDaSemana(semanaAtual);
+  const w = semana(semanaAtual);
+  const hoje = hojeISO();
+  document.getElementById('wkLabel').textContent = semanaAtual.replace('-W','  sem ');
+  document.getElementById('subSemana').textContent =
+    `${fmtDia(datas[0])} a ${fmtDia(datas[6])}. Adicione com o +, arraste entre os dias, clique para editar ou mover de semana. Referência: ${NKEYS().map(n => '1 ' + NIVEIS()[n].nome.toLowerCase()).join(', ')} por dia, um deles com o +1 de alcance.`;
+
+  document.getElementById('grade').innerHTML = DIAS.map((dia,i) => {
+    const todos = w.dias[dia] || [];
+    const cards = todos.filter(c => c.tipo !== 'story');
+    const stories = todos.filter(c => c.tipo === 'story');
+    return `
+    <div class="dia${isoDe(datas[i]) === hoje ? ' hoje' : ''}" data-dia="${dia}">
+      <div class="dia-head"><b>${DIAS_LONGO[dia]}</b><span class="num">${fmtDia(datas[i])}</span></div>
+      <div class="slots" data-dia="${dia}">
+        ${cards.map(c => cardHTML(c)).join('')}
+        ${stories.length ? `<span class="stories-sep">stories</span>` : ''}
+        ${stories.map(c => storyHTML(c)).join('')}
+        <div class="dia-foot">
+          <button class="add-card" data-add="${dia}" title="Adicionar card">+</button>
+          <button class="add-card add-story" data-addstory="${dia}" title="Adicionar story"><span class="ring"></span>+</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
+  const grade = document.getElementById('grade');
+  grade.querySelectorAll('.slot, .story').forEach(el => {
+    el.onclick = () => {
+      if(el.dataset.drg){ delete el.dataset.drg; return; } // fim de arrasto, não é clique
+      if(el.classList.contains('story')) abrirStory(el.dataset.dia, el.dataset.id);
+      else abrirCard(el.dataset.dia, el.dataset.id);
+    };
+    el.onpointerdown = e => iniciaArrasto(e, el);
+  });
+  grade.querySelectorAll('[data-add]').forEach(b => {
+    b.onclick = e => { e.stopPropagation(); abrirCard(b.dataset.add, null); };
+  });
+  grade.querySelectorAll('[data-addstory]').forEach(b => {
+    b.onclick = e => { e.stopPropagation(); abrirStory(b.dataset.addstory, null); };
+  });
+}
+
+/* Arrasto por pointer events: mouse arrasta entre os dias; no toque,
+   o clique abre o editor, que tem o "mover para" de dia e semana. */
+let drag = null;
+function limpaDrop(){ document.querySelectorAll('.drop-alvo').forEach(x => x.classList.remove('drop-alvo')); }
+function iniciaArrasto(e, el){
+  if(e.pointerType !== 'mouse' || e.button !== 0) return;
+  drag = {id:el.dataset.id, el, x0:e.clientX, y0:e.clientY, on:false};
+  window.addEventListener('pointermove', moveArrasto);
+  window.addEventListener('pointerup', soltaArrasto, {once:true});
+}
+function moveArrasto(e){
+  if(!drag) return;
+  if(!drag.on){
+    if(Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6) return;
+    drag.on = true;
+    drag.el.classList.add('arrastando');
+    const g = drag.el.cloneNode(true);
+    g.classList.add('ghost');
+    g.style.width = drag.el.offsetWidth + 'px';
+    document.body.appendChild(g);
+    drag.ghost = g;
+    document.body.style.userSelect = 'none';
+  }
+  drag.ghost.style.left = (e.clientX + 10) + 'px';
+  drag.ghost.style.top = (e.clientY + 8) + 'px';
+  limpaDrop();
+  drag.ghost.style.pointerEvents = 'none';
+  const sob = document.elementFromPoint(e.clientX, e.clientY);
+  const col = sob && sob.closest('.dia');
+  drag.col = col || null;
+  drag.sobre = sob && sob.closest('.slot');
+  if(col) col.classList.add('drop-alvo');
+}
+function soltaArrasto(e){
+  window.removeEventListener('pointermove', moveArrasto);
+  if(!drag) return;
+  const d = drag; drag = null;
+  document.body.style.userSelect = '';
+  if(d.ghost) d.ghost.remove();
+  limpaDrop();
+  d.el.classList.remove('arrastando');
+  if(!d.on) return; // foi só um clique, o onclick abre o editor
+  d.el.dataset.drg = '1';
+  if(d.col && d.col.dataset.dia){
+    const antes = d.sobre && d.sobre.dataset.id !== d.id ? d.sobre.dataset.id : null;
+    moveCard(d.id, semanaAtual, d.col.dataset.dia, antes);
+  }
+}
+
+function cardHTML(c){
+  const q = qById(c.quadro);
+  const nivel = c.nivel || (q && q.nivel);
+  const cfg = NIVEIS()[nivel] || {cor:'#7D97A3', nome:nivel||''};
+  return `<div class="slot" data-id="${esc(c.id)}" data-dia="${esc(diaDoCard(c.id))}">
+    <span class="nivel-tag" style="color:${cfg.cor}"><i style="background:${cfg.cor}"></i>${esc(cfg.nome)}</span>
+    ${q ? `<span class="quadro-nome">${esc(q.nome)}</span>` : ''}
+    <span class="tema">${esc(c.tema||'(sem tema)')}</span>
+    <span class="slot-foot">
+      <span class="st ${c.status||'ideia'}">${c.status||'ideia'}</span>
+      ${c.alcance ? '<span class="alc">+1</span>' : ''}
+    </span>
+  </div>`;
+}
+function diaDoCard(id){ const p = achaCard(id); return p ? p.dia : ''; }
+
+function storyHTML(c){
+  return `<div class="story${c.feito ? ' feito' : ''}" data-id="${esc(c.id)}" data-dia="${esc(diaDoCard(c.id))}">
+    <span class="ring"></span><span class="story-txt">${esc(c.tema||'(story)')}</span>
+  </div>`;
+}
+
+function abrirStory(dia, id){
+  const pos = id ? achaCard(id) : null;
+  const s = pos ? pos.card : {};
+  if(pos) dia = pos.dia;
+  const opSemanas = [-1,0,1,2,3,4].map(n => {
+    const wk = deslocaSemana(semanaAtual, n);
+    const rot = n===-1 ? 'semana passada' : n===0 ? 'esta semana' : n===1 ? 'semana que vem' : `em ${n} semanas`;
+    return {wk, rot: rot + '  (' + wk.replace('-W',' sem ') + ')'};
+  });
+  const o = overlay(`
+    <div class="editor" style="max-width:420px">
+      <div class="editor-head"><h3>${id ? 'Story de ' : 'Novo story, '}${DIAS_LONGO[dia]}</h3><button class="fechar" data-x>&times;</button></div>
+      <div class="editor-body">
+        <div class="campo">
+          <label>Story</label>
+          <input id="sTexto" value="${esc(s.tema||'')}" placeholder="O que vai pro story, numa linha">
+        </div>
+        <div class="linha2">
+          <div class="campo"><label>Semana</label>
+            <select id="sSemana">${opSemanas.map(x => `<option value="${x.wk}" ${x.wk===semanaAtual?'selected':''}>${esc(x.rot)}</option>`).join('')}</select>
+          </div>
+          <div class="campo"><label>Dia</label>
+            <select id="sDia">${DIAS.map(d => `<option value="${d}" ${d===dia?'selected':''}>${DIAS_LONGO[d]}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="campo">
+          <label class="checkline"><input type="checkbox" id="sFeito" ${s.feito?'checked':''}> Já postei este story</label>
+        </div>
+      </div>
+      <div class="editor-foot">
+        <button class="btn lima" data-salvar>Salvar</button>
+        <button class="btn linha" data-x>Cancelar</button>
+        ${id ? '<button class="btn-del" data-apaga>Excluir</button>' : ''}
+      </div>
+    </div>`);
+  o.querySelector('[data-salvar]').onclick = () => {
+    const texto = o.querySelector('#sTexto').value.trim();
+    if(!texto){ toast('Escreva o story'); return; }
+    const wkAlvo = o.querySelector('#sSemana').value;
+    const diaAlvo = o.querySelector('#sDia').value;
+    const sid = id || ('s' + Date.now() + Math.random().toString(36).slice(2,6));
+    if(id && pos && (wkAlvo !== pos.wk || diaAlvo !== pos.dia)){
+      S.semanas[pos.wk].dias[pos.dia].splice(achaCard(id).i, 1);
+    }
+    gravaCard(wkAlvo, diaAlvo, sid, {tipo:'story', tema:texto, feito:o.querySelector('#sFeito').checked});
+    fecha();
+  };
+  const del = o.querySelector('[data-apaga]');
+  if(del) del.onclick = () => { gravaCard(null, null, id, null); fecha(); };
+  o.querySelector('#sTexto').focus();
+}
+
+function renderBanco(){
+  const alvo = document.getElementById('listaIdeias');
+  if(!S.ideias.length){
+    alvo.innerHTML = `<div class="vazio-msg">O banco está vazio. Toda ideia que aparecer no meio do dia entra aqui, sem precisar decidir dia nem formato.</div>`;
+    return;
+  }
+  alvo.innerHTML = S.ideias.map(id => {
+    const q = qById(id.quadro);
+    return `<div class="ideia">
+      <div class="corpo">
+        <div class="tema">${esc(id.tema)}</div>
+        ${id.hook ? `<div class="hook">"${esc(id.hook)}"</div>` : ''}
+        <div class="meta">
+          ${id.intencao ? `<span class="chip">${esc(id.intencao)}</span>` : ''}
+          ${id.formato ? `<span class="chip">${esc(id.formato)}</span>` : ''}
+          ${q ? `<span class="chip">${esc(q.nome)}</span><span class="chip">${esc(NIVEIS()[q.nivel].nome)}</span>` : ''}
+        </div>
+      </div>
+      <div class="acoes">
+        <button class="ic" data-edita="${id.id}">editar</button>
+        <button class="ic" data-agenda="${id.id}">agendar</button>
+      </div>
+    </div>`;
+  }).join('');
+  alvo.querySelectorAll('[data-edita]').forEach(b => b.onclick = () => abrirIdeia(b.dataset.edita));
+  alvo.querySelectorAll('[data-agenda]').forEach(b => b.onclick = () => agendarIdeia(b.dataset.agenda));
+}
+
+function renderHistorico(){
+  const chaves = []; let k = semanaAtual;
+  for(let i=0;i<8;i++){ chaves.push(k); k = deslocaSemana(k,-1); }
+  const uso = {}; QUADROS().forEach(q => uso[q.id] = 0);
+  chaves.forEach(c => {
+    const w = S.semanas[c]; if(!w) return;
+    Object.values(w.dias||{}).flat().forEach(s => { if(s.quadro && uso[s.quadro] !== undefined) uso[s.quadro]++; });
+  });
+  const max = Math.max(1, ...Object.values(uso));
+  document.getElementById('abandono').innerHTML = QUADROS().map(q => {
+    const n = uso[q.id];
+    return `<div class="ab${n===0?' frio':''}">
+      <b>${esc(q.nome)}</b>
+      <div class="barra"><i style="width:${Math.round(n/max*100)}%"></i></div>
+      <span class="c">${n === 0 ? 'nenhum post em 8 semanas' : n + (n===1?' post':' posts')}</span>
+    </div>`;
+  }).join('');
+
+  const pubs = S.publicados.slice().sort((a,b) => (b.data||'').localeCompare(a.data||''));
+  document.getElementById('tabelaPublicados').innerHTML =
+    `<tr><th style="width:88px">Data</th><th>Tema</th><th>Hook</th><th style="width:96px">Canal</th><th style="width:110px">Resultado</th></tr>` +
+    pubs.map(p => `<tr>
+      <td class="n">${esc(p.data)}</td>
+      <td>${esc(p.tema)}</td>
+      <td style="color:var(--cinza)">${esc(p.hook)}</td>
+      <td class="n">${esc(p.canal)}</td>
+      <td class="n">${esc(p.metrica)}</td>
+    </tr>`).join('');
+}
+
+/* =========================================================
+   Editores
+   ========================================================= */
+function overlay(html){
+  const o = document.createElement('div');
+  o.className = 'overlay';
+  o.innerHTML = html;
+  o.onclick = e => { if(e.target === o) fecha(); };
+  document.body.appendChild(o);
+  o.querySelectorAll('[data-x]').forEach(b => b.onclick = fecha);
+  return o;
+}
+function fecha(){ document.querySelectorAll('.overlay').forEach(o => o.remove()); }
+
+function abrirCard(dia, id){
+  const pos = id ? achaCard(id) : null;
+  const s = pos ? pos.card : {};
+  if(pos) dia = pos.dia;
+  if(!QUADROS().length){ toast('Nenhum quadro cadastrado'); return; }
+  const qSel = qById(s.quadro) || QUADROS()[0];
+
+  const opSemanas = [-1,0,1,2,3,4].map(n => {
+    const wk = deslocaSemana(semanaAtual, n);
+    const rot = n===-1 ? 'semana passada' : n===0 ? 'esta semana' : n===1 ? 'semana que vem' : `em ${n} semanas`;
+    return {wk, rot: rot + '  (' + wk.replace('-W',' sem ') + ')'};
+  });
+
+  const o = overlay(`
+    <div class="editor">
+      <div class="editor-head">
+        <h3>${id ? 'Card de ' : 'Novo card, '}${DIAS_LONGO[dia]}</h3>
+        <button class="fechar" data-x>&times;</button>
+      </div>
+      <div class="editor-body">
+        <div class="campo">
+          <label>Quadro</label>
+          <div class="radios">
+            ${QUADROS().map(q => {
+              const cor = (NIVEIS()[q.nivel]||{}).cor || '#7D97A3';
+              return `<label style="border-left:3px solid ${cor}"><input type="radio" name="q" value="${q.id}" ${q.id===qSel.id?'checked':''}>${esc(q.nome)}</label>`;
+            }).join('')}
+          </div>
+          <p class="dica" id="dicaQuadro"></p>
+        </div>
+        <div class="campo">
+          <label>Tema</label>
+          <input id="fTema" value="${esc(s.tema||'')}" placeholder="Do que trata, numa frase">
+        </div>
+        <div class="campo">
+          <label>Hook</label>
+          <textarea id="fHook" placeholder="Falável em até 3 segundos. Funciona escrito na tarja da capa">${esc(s.hook||'')}</textarea>
+          <p class="dica">Afirmação forte primeiro, contexto depois, virada no final.</p>
+        </div>
+        <div class="linha2">
+          <div class="campo"><label>Canal</label><select id="fCanal"></select></div>
+          <div class="campo"><label>Status</label>
+            <select id="fStatus">${STATUS.map(st => `<option ${(s.status||'ideia')===st?'selected':''}>${st}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="linha2">
+          <div class="campo"><label>Semana</label>
+            <select id="fSemana">${opSemanas.map(x => `<option value="${x.wk}" ${x.wk===semanaAtual?'selected':''}>${esc(x.rot)}</option>`).join('')}</select>
+          </div>
+          <div class="campo"><label>Dia</label>
+            <select id="fDia">${DIAS.map(d => `<option value="${d}" ${d===dia?'selected':''}>${DIAS_LONGO[d]}</option>`).join('')}</select>
+          </div>
+        </div>
+        <div class="campo">
+          <label class="checkline"><input type="checkbox" id="fAlcance" ${s.alcance?'checked':''}> Este é o +1 de alcance do dia</label>
+        </div>
+      </div>
+      <div class="editor-foot">
+        <button class="btn lima" data-salvar>Salvar</button>
+        <button class="btn linha" data-x>Cancelar</button>
+        ${id ? '<button class="btn-del" data-apaga>Excluir card</button>' : ''}
+      </div>
+    </div>`);
+
+  const atualiza = () => {
+    const q = qById(o.querySelector('input[name=q]:checked').value);
+    o.querySelector('#dicaQuadro').textContent = [q.formato, q.precisa].filter(Boolean).join('. ');
+    o.querySelector('#fCanal').innerHTML = (q.canais||[]).map(c => `<option ${s.canal===c?'selected':''}>${esc(c)}</option>`).join('');
+  };
+  o.querySelectorAll('input[name=q]').forEach(r => r.onchange = atualiza);
+  atualiza();
+
+  o.querySelector('[data-salvar]').onclick = () => {
+    const tema = o.querySelector('#fTema').value.trim();
+    if(!tema){ toast('Escreva o tema antes de salvar'); return; }
+    const q = qById(o.querySelector('input[name=q]:checked').value);
+    const wkAlvo = o.querySelector('#fSemana').value;
+    const diaAlvo = o.querySelector('#fDia').value;
+    const cardId = id || ('c' + Date.now() + Math.random().toString(36).slice(2,6));
+    const dados = {
+      quadro:q.id,
+      nivel:q.nivel,
+      tema,
+      hook:o.querySelector('#fHook').value.trim(),
+      canal:o.querySelector('#fCanal').value,
+      status:o.querySelector('#fStatus').value,
+      alcance:o.querySelector('#fAlcance').checked
+    };
+    if(dados.alcance)
+      semana(wkAlvo).dias[diaAlvo].forEach(x => { if(x.id !== cardId) x.alcance = false; });
+    if(id && pos && (wkAlvo !== pos.wk || diaAlvo !== pos.dia)){
+      S.semanas[pos.wk].dias[pos.dia].splice(achaCard(id).i, 1);
+    }
+    gravaCard(wkAlvo, diaAlvo, cardId, dados);
+    fecha();
+    if(wkAlvo !== semanaAtual) toast('Foi para ' + DIAS_LONGO[diaAlvo] + ' da ' + wkAlvo.replace('-W',' sem '));
+  };
+  const del = o.querySelector('[data-apaga]');
+  if(del) del.onclick = () => { gravaCard(null, null, id, null); fecha(); };
+  o.querySelector('#fTema').focus();
+}
+
+function abrirIdeia(id){
+  const i = (id ? S.ideias.find(x => x.id === id) : null) || {};
+  const ints = G().intencoes || [];
+  const o = overlay(`
+    <div class="editor">
+      <div class="editor-head"><h3>${id?'Editar ideia':'Nova ideia'}</h3><button class="fechar" data-x>&times;</button></div>
+      <div class="editor-body">
+        <div class="campo">
+          <label>Tema</label>
+          <input id="iTema" value="${esc(i.tema||'')}" placeholder="A referência, o dado ou a observação que originou">
+        </div>
+        <div class="campo">
+          <label>O que eu quero</label>
+          <div class="radios">
+            ${ints.map(x => `<label><input type="radio" name="int" value="${esc(x.nome)}" ${i.intencao===x.nome?'checked':''}>${esc(x.nome)}</label>`).join('')}
+          </div>
+          <p class="dica">${ints.map(x => esc(x.nome) + ': ' + esc(x.desc||'')).join('. ')}</p>
+        </div>
+        <div class="campo">
+          <label>Hook</label>
+          <textarea id="iHook" placeholder="Se já tiver">${esc(i.hook||'')}</textarea>
+        </div>
+        <div class="linha2">
+          <div class="campo"><label>Formato próprio</label>
+            <select id="iFormato"><option value="">a decidir</option>${(G().formatos||[]).map(f => `<option ${i.formato===f?'selected':''}>${esc(f)}</option>`).join('')}</select>
+          </div>
+          <div class="campo"><label>Quadro do funil</label>
+            <select id="iQuadro"><option value="">a decidir</option>${QUADROS().map(q => `<option value="${q.id}" ${i.quadro===q.id?'selected':''}>${esc(NIVEIS()[q.nivel].nome)} · ${esc(q.nome)}</option>`).join('')}</select>
+          </div>
+        </div>
+      </div>
+      <div class="editor-foot">
+        <button class="btn lima" data-salvar>Salvar</button>
+        <button class="btn linha" data-x>Cancelar</button>
+        ${id ? '<button class="btn-del" data-apaga>Excluir</button>' : ''}
+      </div>
+    </div>`);
+  o.querySelector('[data-salvar]').onclick = () => {
+    const tema = o.querySelector('#iTema').value.trim();
+    if(!tema){ toast('Escreva o tema'); return; }
+    const dados = {
+      tema,
+      hook:o.querySelector('#iHook').value.trim(),
+      intencao:(o.querySelector('input[name=int]:checked')||{}).value||'',
+      formato:o.querySelector('#iFormato').value,
+      quadro:o.querySelector('#iQuadro').value
+    };
+    if(id) Object.assign(S.ideias.find(x => x.id === id), dados, {mod:agora()});
+    else S.ideias.unshift({id:'i'+Date.now(), criadoEm:agora(), mod:agora(), ...dados});
+    salvar(); fecha();
+  };
+  const del = o.querySelector('[data-apaga]');
+  if(del) del.onclick = () => {
+    S.removidos = S.removidos || {slots:{}, ideias:{}};
+    S.removidos.ideias[id] = agora();
+    S.ideias = S.ideias.filter(x => x.id !== id);
+    salvar(); fecha();
+  };
+  o.querySelector('#iTema').focus();
+}
+
+function agendarIdeia(id){
+  const i = S.ideias.find(x => x.id === id);
+  if(!i) return;
+  const q = qById(i.quadro);
+  const nivelPad = q ? q.nivel : NKEYS()[0];
+  const o = overlay(`
+    <div class="editor" style="max-width:420px">
+      <div class="editor-head"><h3>Jogar na semana</h3><button class="fechar" data-x>&times;</button></div>
+      <div class="editor-body">
+        <p style="font-size:13px;font-weight:600;margin-bottom:14px">${esc(i.tema)}</p>
+        <div class="linha2">
+          <div class="campo"><label>Dia</label>
+            <select id="aDia">${DIAS.map(d => `<option value="${d}">${DIAS_LONGO[d]}</option>`).join('')}</select></div>
+          <div class="campo"><label>Nível</label>
+            <select id="aNivel">${NKEYS().map(n => `<option value="${n}" ${n===nivelPad?'selected':''}>${esc(NIVEIS()[n].nome)}</option>`).join('')}</select></div>
+        </div>
+        <p class="dica">Entra como card novo na ${DIAS_LONGO.seg ? 'semana ' + semanaAtual.replace('-W',' sem ') : ''}, junto do que já estiver no dia.</p>
+      </div>
+      <div class="editor-foot">
+        <button class="btn lima" data-salvar>Agendar</button>
+        <button class="btn linha" data-x>Cancelar</button>
+      </div>
+    </div>`);
+  o.querySelector('[data-salvar]').onclick = () => {
+    const dia = o.querySelector('#aDia').value;
+    const nivel = o.querySelector('#aNivel').value;
+    const qq = qById(i.quadro) || QUADROS().find(x => x.nivel === nivel);
+    if(!qq){ toast('Sem quadro para esse nível'); return; }
+    migra(S);
+    S.removidos.ideias[id] = agora();
+    S.ideias = S.ideias.filter(x => x.id !== id);
+    gravaCard(semanaAtual, dia, 'c' + Date.now() + Math.random().toString(36).slice(2,6),
+      {quadro:qq.id, nivel:qq.nivel, tema:i.tema, hook:i.hook||'', canal:(qq.canais||[])[0]||'', status:'ideia', alcance:false});
+    fecha();
+    toast('Foi para ' + DIAS_LONGO[dia]);
+  };
+}
+
+/* =========================================================
+   Briefing, a ponte com a conversa
+   ========================================================= */
+function montaBriefing(){
+  const w = semana(semanaAtual);
+  const datas = datasDaSemana(semanaAtual);
+  let t = `# Minha semana ${semanaAtual} (${fmtDia(datas[0])} a ${fmtDia(datas[6])})\n\n`;
+  t += `Tática 3-3-1: ${NKEYS().map(n => '1 ' + NIVEIS()[n].nome.toLowerCase()).join(' + ')} por dia, mais um +1 de alcance.\n\n`;
+  DIAS.forEach((d,idx) => {
+    t += `## ${DIAS_LONGO[d]} ${fmtDia(datas[idx])}\n`;
+    const doDia = (w.dias[d]||[]).filter(x => x.tema);
+    const cards = doDia.filter(x => x.tipo !== 'story');
+    const stories = doDia.filter(x => x.tipo === 'story');
+    if(!cards.length && !stories.length){ t += `- VAZIO\n\n`; return; }
+    if(!cards.length) t += `- VAZIO (só stories)\n`;
+    stories.forEach(s => { t += `- story: ${s.tema}${s.feito ? ' (feito)' : ''}\n`; });
+    cards.forEach(s => {
+      const q = qById(s.quadro);
+      const nv = s.nivel || (q && q.nivel);
+      const nomeNivel = (NIVEIS()[nv]||{}).nome || '';
+      t += `- ${nomeNivel ? nomeNivel + ': ' : ''}${s.tema}${q ? ` [${q.nome}, ${s.canal||(q.canais||[])[0]}]` : ''}`
+         + `${s.hook ? `\n  hook: "${s.hook}"` : ''} (${s.status||'ideia'})${s.alcance?' +1 alcance':''}\n`;
+    });
+    t += `\n`;
+  });
+  if(S.ideias.length){
+    t += `## Banco de ideias sem dia\n`;
+    S.ideias.forEach(i => { t += `- ${i.tema}${i.intencao?` (${i.intencao})`:''}${i.hook?` | hook: "${i.hook}"`:''}\n`; });
+    t += `\n`;
+  }
+  t += `## Já publicado recentemente, não repetir\n`;
+  S.publicados.slice().sort((a,b)=>(b.data||'').localeCompare(a.data||'')).slice(0,8)
+    .forEach(p => { t += `- ${p.data} ${p.tema} (${p.metrica||''})\n`; });
+  t += `\nPreencha os dias VAZIOS respeitando o quadro e o canal de cada nível, no meu tom, sem travessão, com hook falável em 3 segundos.`;
+  return t;
+}
+
+/* =========================================================
+   Conexão
+   ========================================================= */
+function abrirSync(){
+  const c = gh.cfg() || {};
+  const o = overlay(`
+    <div class="editor" style="max-width:480px">
+      <div class="editor-head"><h3>Conectar ao seu repositório</h3><button class="fechar" data-x>&times;</button></div>
+      <div class="editor-body">
+        <p style="font-size:12.5px;color:var(--cinza);margin-bottom:16px;line-height:1.5">
+          Esta página é só a interface. O conteúdo mora num repositório privado seu, o que faz a sua semana
+          abrir em qualquer aparelho e permite que o Claude leia e escreva nela pela conversa.
+        </p>
+        <div class="campo">
+          <label>Repositório</label>
+          <input id="sRepo" value="${esc(c.repo||'')}" placeholder="usuario/mente-desobediente-dados">
+        </div>
+        <div class="campo">
+          <label>Token pessoal do GitHub</label>
+          <input id="sToken" type="password" value="${esc(c.token||'')}" placeholder="github_pat_...">
+          <p class="dica">Fine-grained token com permissão de Contents (leitura e escrita) apenas nesse repositório. Fica guardado só neste navegador.</p>
+        </div>
+        <p class="dica" id="sErro" style="color:#C2185B"></p>
+      </div>
+      <div class="editor-foot">
+        <button class="btn lima" data-salvar>Conectar</button>
+        <button class="btn linha" data-x>Cancelar</button>
+        ${c.token ? '<button class="btn-del" data-apaga>Desconectar</button>' : ''}
+      </div>
+    </div>`);
+  o.querySelector('[data-salvar]').onclick = async () => {
+    const repo = o.querySelector('#sRepo').value.trim();
+    const token = o.querySelector('#sToken').value.trim();
+    const erro = o.querySelector('#sErro');
+    if(!repo || !token){ erro.textContent = 'Preencha os dois campos.'; return; }
+    localStorage.setItem(CHAVE_GH, JSON.stringify({repo, token, arquivo:'sistema.json'}));
+    gh.sha = null;
+    erro.textContent = 'Conectando...';
+    try{
+      await gh.puxar();
+      if(!temConteudo()){ erro.textContent = 'Conectou, mas não achei sistema.json com conteúdo nesse repositório.'; return; }
+      fecha(); iniciar(); marcaSync('ok','sincronizado');
+      toast('Conectado');
+    }catch(e){
+      erro.textContent = 'Não deu certo: ' + e.message;
+      localStorage.removeItem(CHAVE_GH);
+    }
+  };
+  const del = o.querySelector('[data-apaga]');
+  if(del) del.onclick = () => {
+    localStorage.removeItem(CHAVE_GH); localStorage.removeItem(CHAVE);
+    gh.sha = null; S = null; fecha(); mostrarGate();
+  };
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 2200);
+}
+async function copiar(txt, msg){
+  try{ await navigator.clipboard.writeText(txt); toast(msg); }
+  catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = txt; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); ta.remove(); toast(msg);
+  }
+}
+
+/* =========================================================
+   Boot
+   ========================================================= */
+function trocaAba(nome){
+  abaAtual = nome;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.aba === nome));
+  document.getElementById('abaSemana').hidden = nome !== 'semana';
+  document.getElementById('abaBanco').hidden = nome !== 'banco';
+  document.getElementById('abaHistorico').hidden = nome !== 'historico';
+  document.getElementById('wknav').style.visibility = nome === 'banco' ? 'hidden' : 'visible';
+  render();
+}
+function mostrarGate(texto){
+  document.getElementById('app').hidden = true;
+  document.getElementById('gate').hidden = false;
+  if(texto) document.getElementById('gateTexto').textContent = texto;
+}
+function renderTudo(){ renderMarca(); renderGuia(); render(); }
+
+function iniciar(){
+  document.getElementById('gate').hidden = true;
+  document.getElementById('app').hidden = false;
+  semanaAtual = semanaAtual || isoSemana(new Date());
+  renderTudo();
+  // Nunca dizer "sincronizado" antes de um envio dar certo de verdade.
+  marcaSync(gh.ligado() ? 'busy' : '', gh.ligado() ? 'verificando' : 'local');
+}
+
+document.getElementById('gateBtn').onclick = abrirSync;
+document.getElementById('syncPill').onclick = abrirSync;
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => trocaAba(b.dataset.aba));
+document.getElementById('wkPrev').onclick = () => { semanaAtual = deslocaSemana(semanaAtual,-1); render(); };
+document.getElementById('wkNext').onclick = () => { semanaAtual = deslocaSemana(semanaAtual, 1); render(); };
+document.getElementById('wkHoje').onclick = () => { semanaAtual = isoSemana(new Date()); render(); };
+document.getElementById('btnNovaIdeia').onclick = () => abrirIdeia(null);
+document.getElementById('btnCopiarBanco').onclick = () =>
+  copiar(S.ideias.map(i => `- ${i.tema}${i.hook?` | "${i.hook}"`:''}`).join('\n'), 'Banco copiado');
+document.getElementById('btnBriefing').onclick = () =>
+  copiar(montaBriefing(), 'Briefing da semana copiado, cole na conversa');
+document.addEventListener('keydown', e => { if(e.key === 'Escape') fecha(); });
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') descarregar(); });
+window.addEventListener('pagehide', descarregar);
+window.addEventListener('beforeunload', e => {
+  if(pendente && gh.ligado()){ descarregar(); e.preventDefault(); e.returnValue = ''; }
+});
+
+(async function boot(){
+  carregarLocal();
+  if(temConteudo()){
+    iniciar();
+    if(gh.ligado()){
+      try{
+        if(await gh.puxar()){ renderTudo(); toast('Trouxe novidades do repositório'); }
+        if(pendente) await gh.enviar(); else marcaSync('ok','sincronizado');
+      }catch(e){ marcaSync('err', e.message); }
+    }
+    return;
+  }
+  if(gh.ligado()){
+    mostrarGate('Carregando o seu sistema...');
+    try{
+      await gh.puxar();
+      if(temConteudo()){ iniciar(); return; }
+      mostrarGate('Conectado, mas não achei sistema.json com conteúdo nesse repositório.');
+    }catch(e){ mostrarGate('Não consegui carregar: ' + e.message); }
+    return;
+  }
+  mostrarGate();
+})();
+</script>
+</body>
+</html>
