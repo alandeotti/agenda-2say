@@ -777,7 +777,6 @@ async function conferirNovidades(){
   if(!sb)         { pollMotivo = 'sem-sb';     marcaDiag(); return; }
   if(!marcaAtiva) { pollMotivo = 'sem-marca';  marcaDiag(); return; }
   if(!sessao)     { pollMotivo = 'sem-sessao'; marcaDiag(); return; }
-  if(document.visibilityState !== 'visible'){ pollMotivo = 'oculta'; marcaDiag(); return; }
   if(pendente)    { pollMotivo = 'pendente';   marcaDiag(); return; }
   pollMotivo = 'ok';
   marcaDiag();
