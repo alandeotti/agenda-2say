@@ -445,7 +445,6 @@ const CHAVE_BASE = '2say-sistema-v1';
 const SB_URL = 'https://uimmlosuexmpenbzwcak.supabase.co';
 const SB_KEY = 'sb_publishable_UrI0sU0Bk9xboaOHFSKz5g_HOsutTyu';
 let sb = null;
-let canal = null;   // assinatura de tempo real da marca ativa
 
 let sessao = null;        // { email } de quem esta logado
 let marcasLista = [];     // marcas que o RLS deixou esta pessoa ver
@@ -757,32 +756,40 @@ const gh = {
 };
 
 /* ---------------------------------------------------------------------
-   Tempo real. Uma assinatura por marca; ao trocar de marca, troca o canal.
-   O que chega passa pelo mesmo `mesclar` do envio — quem estiver com uma
-   edicao local ainda nao enviada nao a perde.
+   Manter a tela em dia com o que os outros fizeram.
+
+   Tentei WebSocket (supabase realtime) primeiro e nao subiu conexao nenhuma
+   — nem o callback de status disparava. Em vez de seguir escavando, isto
+   pergunta ao banco de 20 em 20 segundos, que para uma agenda editada
+   algumas vezes por dia da no mesmo e nunca falha em silencio.
+
+   `gh.puxar()` ja mescla e devolve se mudou algo, entao edicao local ainda
+   nao enviada continua protegida.
    --------------------------------------------------------------------- */
-function ouvirMudancas(){
-  if(canal){ try{ sb.removeChannel(canal); }catch(e){} canal = null; }
-  if(!sb || !marcaAtiva) return;
-  canal = sb.channel('sistema-' + marcaAtiva)
-    .on('postgres_changes',
-        {event:'UPDATE', schema:'public', table:'sistemas', filter:'marca_id=eq.' + marcaAtiva},
-        payload => {
-          console.log('[agenda] chegou mudanca', payload && payload.eventType);
-          const novo = payload && payload.new;
-          if(!novo || !novo.dados || !novo.dados.guia) return;
-          // O eco da propria gravacao nao interessa.
-          if(novo.atualizado_por && sessao && novo.atualizado_por === sessao.email) return;
-          S = mesclar(S, novo.dados);
-          try{ localStorage.setItem(CHAVE(), JSON.stringify(S)); }catch(e){}
-          renderTudo();
-          const quem = (novo.atualizado_por || '').split('@')[0];
-          toast((quem ? quem : 'Alguem') + ' acabou de mexer aqui');
-        })
-    .subscribe((status, err) => {
-      console.log('[agenda] canal', marcaAtiva, status, err || '');
-    });
+let timerPoll = null;
+
+async function conferirNovidades(){
+  if(!sb || !marcaAtiva || !sessao) return;
+  if(document.visibilityState !== 'visible') return;  // aba escondida nao precisa
+  if(pendente) return;                                 // tenho coisa minha pra enviar antes
+  try{
+    if(await gh.puxar()){
+      renderTudo();
+      toast('A agenda mudou — atualizei aqui');
+    }
+  }catch(e){ /* erro de rede passageiro nao vira alarme */ }
 }
+
+function ouvirMudancas(){
+  if(timerPoll){ clearInterval(timerPoll); timerPoll = null; }
+  if(!sb || !marcaAtiva) return;
+  timerPoll = setInterval(conferirNovidades, 20000);
+}
+
+/* Voltou pra aba depois de um tempo fora: confere na hora, sem esperar o ciclo. */
+document.addEventListener('visibilitychange', () => {
+  if(document.visibilityState === 'visible') conferirNovidades();
+});
 
 /* Mensagem do Postgres nao serve para quem esta usando. */
 function traduzErro(e){
@@ -1595,7 +1602,7 @@ async function entrar(){
 
 async function sair(){
   if(pendente && gh.ligado()){ clearTimeout(syncTimer); try{ await gh.enviar(); }catch(e){} }
-  if(canal){ try{ sb.removeChannel(canal); }catch(e){} canal = null; }
+  if(timerPoll){ clearInterval(timerPoll); timerPoll = null; }
   await sb.auth.signOut();
   sessao = null; S = null; marcasLista = []; papeis = {}; marcaAtiva = null; pendente = false;
   mostrarLogin();
