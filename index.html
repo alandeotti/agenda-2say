@@ -767,11 +767,21 @@ const gh = {
    nao enviada continua protegida.
    --------------------------------------------------------------------- */
 let timerPoll = null;
+let ultimoCarimbo = null;   // atualizado_em visto por ultimo
 
 async function conferirNovidades(){
   if(!sb || !marcaAtiva || !sessao) return;
   if(pendente) return;   // tenho edicao minha pra enviar antes
   try{
+    // Pergunta barata primeiro: so o carimbo, ~100 bytes. O sistema inteiro
+    // tem ~10 KB — baixar isso a cada poucos segundos estouraria a cota.
+    const {data, error} = await sb.from('sistemas')
+      .select('atualizado_em').eq('marca_id', marcaAtiva).maybeSingle();
+    if(error) throw new Error(traduzErro(error));
+    const carimbo = data && data.atualizado_em;
+    if(carimbo && carimbo === ultimoCarimbo) return;   // ninguem mexeu
+    ultimoCarimbo = carimbo;
+
     if(await gh.puxar()){
       renderTudo();
       toast('A agenda mudou — atualizei aqui');
@@ -789,7 +799,8 @@ async function conferirNovidades(){
 function ouvirMudancas(){
   if(timerPoll){ clearInterval(timerPoll); timerPoll = null; }
   if(!sb || !marcaAtiva) return;
-  timerPoll = setInterval(conferirNovidades, 20000);
+  ultimoCarimbo = null;   // marca nova, carimbo de outra nao vale
+  timerPoll = setInterval(conferirNovidades, 4000);
 }
 
 /* Voltou pra aba depois de um tempo fora: confere na hora, sem esperar o ciclo. */
