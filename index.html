@@ -7,6 +7,7 @@
 <meta name="robots" content="noindex, nofollow">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Schibsted+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -57,6 +58,11 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
 .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-size:16px;color:var(--branco)}
 .brand .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--limao);font-family:'JetBrains Mono',monospace}
+#loginForm .campo{margin-bottom:12px;text-align:left}
+#loginForm input{width:100%;padding:9px 11px;border:1px solid var(--linha-forte);border-radius:4px;font:inherit;font-size:13px}
+#loginForm .dica{font-size:11px;color:var(--cinza-claro);margin-top:9px;line-height:1.45}
+body.leitura #btnNovaIdeia{display:none}
+body.leitura .slot,body.leitura .story{cursor:default}
 .gate-troca{margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);display:flex;align-items:center;gap:8px}
 .gate-troca label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza-claro)}
 #selMarcaGate{
@@ -304,7 +310,7 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
 <div class="gate" id="gate" hidden>
   <div class="gate-caixa">
     <div class="gate-marca">
-      <h1>Sistema</h1>
+      <h1>Agenda</h1>
       <span id="gateSub">conteúdo privado</span>
     </div>
     <div class="gate-corpo">
@@ -312,11 +318,19 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
         Esta página é só a interface. Todo o conteúdo fica num repositório privado seu.
         Conecte para carregar o seu sistema.
       </p>
-      <button class="btn lima" id="gateBtn">Conectar</button>
-      <div class="gate-troca">
+      <div id="loginForm">
+        <div class="campo">
+          <label for="loginEmail">Seu e-mail</label>
+          <input id="loginEmail" type="email" autocomplete="email" placeholder="voce@empresa.com">
+        </div>
+        <button class="btn lima" id="gateBtn">Entrar</button>
+        <p class="dica" id="loginDica">Você recebe um link por e-mail. Não tem senha.</p>
+      </div>
+      <div id="gateTroca" class="gate-troca" hidden>
         <label for="selMarcaGate">Ver outra marca</label>
         <select id="selMarcaGate"></select>
       </div>
+      <button class="btn linha" id="btnSair" hidden style="margin-top:12px">Sair</button>
     </div>
   </div>
 </div>
@@ -413,45 +427,26 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
    guardado no repositório privado.
    ========================================================= */
 const CHAVE_BASE = '2say-sistema-v1';
-const CHAVE_GH = '2say-gh';
 
-/* Uma marca = um sistema completo e independente (guia, semanas, ideias,
-   histórico), num arquivo próprio. Podem morar em repositórios diferentes:
-   token fine-grained só alcança repo do dono que o emitiu, então a marca de
-   outra pessoa precisa do token dela. */
-const MARCAS_PADRAO = [
-  {id:'2say',   nome:'2SAY',   repo:'alandeotti/agenda-grupo', arquivo:'sistema-2say.json', token:''},
-  {id:'bee',    nome:'Béé',    repo:'alandeotti/agenda-grupo', arquivo:'sistema-bee.json',  token:''},
-  {id:'andrey', nome:'Andrey', repo:'',                        arquivo:'sistema.json',      token:''}
-];
+/* ---------------------------------------------------------------------
+   Supabase. A chave publicavel pode viver aqui: ela nao autoriza nada
+   sozinha — quem decide o que cada pessoa ve e o RLS, por e-mail.
+   --------------------------------------------------------------------- */
+const SB_URL = 'https://uimmlosuexmpenbzwcak.supabase.co';
+const SB_KEY = 'sb_publishable_UrI0sU0Bk9xboaOHFSKz5g_HOsutTyu';
+let sb = null;
 
-function cfgGeral(){
-  let c = null;
-  try{ c = JSON.parse(localStorage.getItem(CHAVE_GH)||'null'); }catch(e){}
-  if(c && c.marcas) return c;
-  // Migra do formato antigo de marca única, preservando o token já digitado.
-  const tokenAntigo = (c && c.token) ? c.token : '';
-  c = {marcaAtiva:'2say', marcas: MARCAS_PADRAO.map(m =>
-        Object.assign({}, m, m.id === '2say' ? {token: tokenAntigo} : {}))};
-  gravaCfgGeral(c);
-  return c;
-}
-function gravaCfgGeral(c){ try{ localStorage.setItem(CHAVE_GH, JSON.stringify(c)); }catch(e){} }
-/* O token vale pelo repositório, não pela marca. Se duas marcas moram no mesmo
-   repo, a segunda aproveita o token da primeira em vez de pedir de novo. */
-function tokenDe(c, m){
-  if(m.token) return m.token;
-  if(!m.repo) return '';
-  const irma = c.marcas.find(x => x !== m && x.repo === m.repo && x.token);
-  return irma ? irma.token : '';
-}
+let sessao = null;        // { email } de quem esta logado
+let marcasLista = [];     // marcas que o RLS deixou esta pessoa ver
+let papeis = {};          // marca_id -> 'editor' | 'leitor'
+let marcaAtiva = null;
+
 function marcaAtual(){
-  const c = cfgGeral();
-  const m = c.marcas.find(x => x.id === c.marcaAtiva) || c.marcas[0];
-  const t = tokenDe(c, m);
-  return t === m.token ? m : Object.assign({}, m, {token: t});
+  return marcasLista.find(m => m.id === marcaAtiva) || marcasLista[0] || {id:'', nome:''};
 }
-const CHAVE = () => CHAVE_BASE + ':' + marcaAtual().id;
+function podeEditar(){ return papeis[marcaAtiva] === 'editor'; }
+
+const CHAVE = () => CHAVE_BASE + ':' + ((sessao && sessao.email) || 'anon') + ':' + marcaAtiva;
 const DIAS = ['seg','ter','qua','qui','sex','sab','dom'];
 const DIAS_LONGO = {seg:'segunda',ter:'terça',qua:'quarta',qui:'quinta',sex:'sexta',sab:'sábado',dom:'domingo'};
 const STATUS = ['ideia','gravar','editar','publicado'];
@@ -702,29 +697,26 @@ function carregarLocal(){
   }
 }
 
+/* ---------------------------------------------------------------------
+   Camada de dados. Antes falava com a API do GitHub; agora com o Supabase.
+   O merge continua existindo: duas pessoas editando a mesma marca nao
+   podem apagar o trabalho uma da outra.
+   --------------------------------------------------------------------- */
 const gh = {
-  cfg(){ const m = marcaAtual(); return (m && m.token && m.repo) ? m : null; },
-  ligado(){ return !!this.cfg(); },
-  sha:null,
-  url(){ const c = this.cfg(); return `https://api.github.com/repos/${c.repo}/contents/${c.arquivo||'sistema.json'}`; },
+  ligado(){ return !!(sb && sessao && marcaAtiva); },
   async ler(){
-    const c = this.cfg(); if(!c) return null;
-    const r = await fetch(this.url() + '?t=' + Date.now(),
-      {headers:{Authorization:`Bearer ${c.token}`, Accept:'application/vnd.github+json'}, cache:'no-store'});
-    if(r.status === 404) return {novo:true};
-    if(r.status === 401 || r.status === 403) throw new Error('token sem acesso');
-    if(!r.ok) throw new Error('leitura ' + r.status);
-    const j = await r.json();
-    this.sha = j.sha;
-    const txt = new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,'')), ch => ch.charCodeAt(0)));
-    return JSON.parse(txt);
+    if(!this.ligado()) return null;
+    const {data, error} = await sb.from('sistemas')
+      .select('dados').eq('marca_id', marcaAtiva).maybeSingle();
+    if(error) throw new Error(traduzErro(error));
+    if(!data) return {novo:true};
+    return data.dados;
   },
-  async enviar(retentativa){
-    const c = this.cfg(); if(!c) return;
+  async enviar(){
+    if(!this.ligado()) return;
+    if(!podeEditar()){ pendente = false; marcaSync('', 'somente leitura'); return; }
     try{
       marcaSync('busy','enviando');
-      // Traz o que houver de novo no repositório e mistura antes de gravar,
-      // para nunca apagar o que foi escrito do outro lado.
       let remoto = null;
       try{ remoto = await this.ler(); }catch(e){}
       if(remoto && !remoto.novo && remoto.guia){
@@ -732,20 +724,9 @@ const gh = {
         try{ localStorage.setItem(CHAVE(), JSON.stringify(S)); }catch(e){}
         renderTudo();
       }
-      const bytes = new TextEncoder().encode(JSON.stringify(S,null,2));
-      let bin = ''; bytes.forEach(b => bin += String.fromCharCode(b));
-      const body = {message:'sistema: ' + agora(), content:btoa(bin)};
-      if(this.sha) body.sha = this.sha;
-      const r = await fetch(this.url(), {
-        method:'PUT', keepalive:true,
-        headers:{Authorization:`Bearer ${c.token}`, Accept:'application/vnd.github+json'},
-        body:JSON.stringify(body)
-      });
-      if(r.status === 409 && !retentativa){ this.sha = null; return this.enviar(true); }
-      if(r.status === 403) throw new Error('token sem escrita');
-      if(!r.ok) throw new Error('envio ' + r.status);
-      const j = await r.json();
-      this.sha = j.content.sha;
+      const {error} = await sb.from('sistemas')
+        .update({dados: S}).eq('marca_id', marcaAtiva);
+      if(error) throw new Error(traduzErro(error));
       pendente = false;
       marcaSync('ok','sincronizado');
     }catch(e){ marcaSync('err', e.message); }
@@ -763,6 +744,15 @@ const gh = {
     return false;
   }
 };
+
+/* Mensagem do Postgres nao serve para quem esta usando. */
+function traduzErro(e){
+  const m = (e && (e.message || e.hint || '')) + '';
+  if(/row-level security|violates row-level/i.test(m)) return 'sem permissao de escrita nesta marca';
+  if(/JWT|expired|not authenticated/i.test(m)) return 'sessao expirada, entre de novo';
+  if(/Failed to fetch|NetworkError/i.test(m)) return 'sem conexao';
+  return m || 'erro desconhecido';
+}
 
 function marcaSync(estado, txt){
   const d = document.getElementById('syncDot');
@@ -802,9 +792,8 @@ function renderMarca(){
 }
 
 function renderSeletorMarca(){
-  const c = cfgGeral();
-  const html = c.marcas.map(m =>
-    `<option value="${esc(m.id)}" ${m.id===c.marcaAtiva?'selected':''}>${esc(m.nome)}${m.repo&&tokenDe(c,m)?'':' ·'}</option>`
+  const html = marcasLista.map(m =>
+    `<option value="${esc(m.id)}" ${m.id===marcaAtiva?'selected':''}>${esc(m.nome)}${papeis[m.id]==='leitor'?' (leitura)':''}</option>`
   ).join('');
   ['selMarca','selMarcaGate'].forEach(id => {
     const sel = document.getElementById(id);
@@ -815,18 +804,15 @@ function renderSeletorMarca(){
 /* Troca de marca: garante que o que está pendente vá embora antes de
    trocar o contexto, senão a edição da marca A seria gravada com o sha da B. */
 async function trocarMarca(id){
-  const c = cfgGeral();
-  if(id === c.marcaAtiva) return;
-  if(pendente && gh.ligado()){
-    clearTimeout(syncTimer);
-    try{ await gh.enviar(); }catch(e){}
-  }
-  c.marcaAtiva = id; gravaCfgGeral(c);
-  gh.sha = null; S = null; pendente = false; semanaAtual = null; abaAtual = 'semana';
+  if(id === marcaAtiva) return;
+  if(pendente && gh.ligado()){ clearTimeout(syncTimer); try{ await gh.enviar(); }catch(e){} }
+  marcaAtiva = id;
+  S = null; pendente = false; semanaAtual = null; abaAtual = 'semana';
   document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.aba === 'semana'));
-  await boot();
+  await carregarMarca();
   renderSeletorMarca();
 }
+
 
 function renderGuia(){
   const g = G();
@@ -942,6 +928,7 @@ function renderSemana(){
 let drag = null;
 function limpaDrop(){ document.querySelectorAll('.drop-alvo').forEach(x => x.classList.remove('drop-alvo')); }
 function iniciaArrasto(e, el){
+  if(!podeEditar()) return;
   if(e.pointerType !== 'mouse' || e.button !== 0) return;
   drag = {id:el.dataset.id, el, x0:e.clientX, y0:e.clientY, on:false};
   window.addEventListener('pointermove', moveArrasto);
@@ -1009,6 +996,7 @@ function storyHTML(c){
 }
 
 function abrirStory(dia, id){
+  if(!podeEditar()){ toast('Você tem acesso de leitura nesta marca'); return; }
   const pos = id ? achaCard(id) : null;
   const s = pos ? pos.card : {};
   if(pos) dia = pos.dia;
@@ -1133,6 +1121,7 @@ function overlay(html){
 function fecha(){ document.querySelectorAll('.overlay').forEach(o => o.remove()); }
 
 function abrirCard(dia, id){
+  if(!podeEditar()){ toast('Você tem acesso de leitura nesta marca'); return; }
   const pos = id ? achaCard(id) : null;
   const s = pos ? pos.card : {};
   if(pos) dia = pos.dia;
@@ -1235,6 +1224,7 @@ function abrirCard(dia, id){
 }
 
 function abrirIdeia(id){
+  if(!podeEditar()){ toast('Você tem acesso de leitura nesta marca'); return; }
   const i = (id ? S.ideias.find(x => x.id === id) : null) || {};
   const ints = G().intencoes || [];
   const o = overlay(`
@@ -1373,73 +1363,35 @@ function montaBriefing(){
 /* =========================================================
    Conexão
    ========================================================= */
-function abrirSync(){
+function abrirConta(){
   const m = marcaAtual();
-  const c = m;
+  const papel = papeis[marcaAtiva] === 'editor' ? 'pode editar' : 'somente leitura';
+  const linhas = marcasLista.map(x =>
+    `<tr><td>${esc(x.nome)}</td><td style="color:var(--cinza)">${papeis[x.id]==='editor'?'editor':'leitor'}</td></tr>`
+  ).join('');
   const o = overlay(`
-    <div class="editor" style="max-width:480px">
-      <div class="editor-head"><h3>Conectar &mdash; ${esc(m.nome)}</h3><button class="fechar" data-x>&times;</button></div>
+    <div class="editor" style="max-width:420px">
+      <div class="editor-head"><h3>Sua conta</h3><button class="fechar" data-x>&times;</button></div>
       <div class="editor-body">
-        <p style="font-size:12.5px;color:var(--cinza);margin-bottom:16px;line-height:1.5">
-          Cada marca tem o seu próprio arquivo, e pode morar num repositório diferente.
-          Token fine-grained só alcança repositório do dono que o emitiu &mdash; marca de outra
-          pessoa precisa do token dela.
+        <p style="font-size:12.5px;color:var(--cinza);margin-bottom:14px;line-height:1.5">
+          Você está como <b>${esc((sessao&&sessao.email)||'')}</b>.<br>
+          Em <b>${esc(m.nome)}</b> você <b>${esc(papel)}</b>.
         </p>
-        <div class="campo">
-          <label>Repositório</label>
-          <input id="sRepo" value="${esc(c.repo||'')}" placeholder="alandeotti/agenda-grupo">
-        </div>
-        <div class="campo">
-          <label>Arquivo</label>
-          <input id="sArquivo" value="${esc(c.arquivo||'sistema.json')}" placeholder="sistema-2say.json">
-        </div>
-        <div class="campo">
-          <label>Token pessoal do GitHub</label>
-          <input id="sToken" type="password" value="${esc(c.token||'')}" placeholder="github_pat_...">
-          <p class="dica">Fine-grained token com permissão de Contents (leitura e escrita) apenas nesse repositório. Fica guardado só neste navegador.</p>
-        </div>
-        <p class="dica" id="sErro" style="color:#C2185B"></p>
+        <table style="width:100%;font-size:12.5px;border-collapse:collapse">
+          <thead><tr><th style="text-align:left;font-weight:500;padding-bottom:4px">Marca</th>
+          <th style="text-align:left;font-weight:500;padding-bottom:4px">Acesso</th></tr></thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        <p class="dica" style="margin-top:14px">
+          Para mudar acesso de alguém, é no painel do Supabase, tabela <code>membros</code>.
+        </p>
       </div>
       <div class="editor-foot">
-        <button class="btn lima" data-salvar>Conectar</button>
-        <button class="btn linha" data-x>Cancelar</button>
-        ${c.token ? '<button class="btn-del" data-apaga>Desconectar</button>' : ''}
+        <button class="btn linha" data-x>Fechar</button>
+        <button class="btn-del" data-sair>Sair desta conta</button>
       </div>
     </div>`);
-  o.querySelector('[data-salvar]').onclick = async () => {
-    const repo = o.querySelector('#sRepo').value.trim();
-    const token = o.querySelector('#sToken').value.trim();
-    const arquivo = o.querySelector('#sArquivo').value.trim() || 'sistema.json';
-    const erro = o.querySelector('#sErro');
-    if(!repo || !token){ erro.textContent = 'Preencha repositório e token.'; return; }
-    const cfg = cfgGeral();
-    const alvo = cfg.marcas.find(x => x.id === m.id);
-    const antes = Object.assign({}, alvo);
-    Object.assign(alvo, {repo, token, arquivo});
-    gravaCfgGeral(cfg);
-    gh.sha = null;
-    erro.textContent = 'Conectando...';
-    try{
-      await gh.puxar();
-      if(!temConteudo()){ erro.textContent = 'Conectou, mas não achei ' + arquivo + ' com conteúdo nesse repositório.'; return; }
-      fecha(); iniciar(); marcaSync('ok','sincronizado');
-      renderSeletorMarca();
-      toast('Conectado — ' + m.nome);
-    }catch(e){
-      erro.textContent = 'Não deu certo: ' + e.message;
-      const volta = cfgGeral();
-      Object.assign(volta.marcas.find(x => x.id === m.id), antes);
-      gravaCfgGeral(volta);
-    }
-  };
-  const del = o.querySelector('[data-apaga]');
-  if(del) del.onclick = () => {
-    const cfg = cfgGeral();
-    Object.assign(cfg.marcas.find(x => x.id === m.id), {token:''});
-    gravaCfgGeral(cfg);
-    localStorage.removeItem(CHAVE());
-    gh.sha = null; S = null; fecha(); renderSeletorMarca(); mostrarGate();
-  };
+  o.querySelector('[data-sair]').onclick = () => { fecha(); sair(); };
 }
 
 function toast(msg){
@@ -1472,7 +1424,10 @@ function mostrarGate(texto){
   document.getElementById('app').hidden = true;
   document.getElementById('gate').hidden = false;
   const m = marcaAtual();
-  document.getElementById('gateSub').textContent = m.nome + ' · conteúdo privado';
+  document.getElementById('loginForm').hidden = true;
+  document.getElementById('gateTroca').hidden = marcasLista.length < 2;
+  document.getElementById('btnSair').hidden = false;
+  document.getElementById('gateSub').textContent = m.nome + ' · ' + ((sessao && sessao.email) || '');
   renderSeletorMarca();
   document.getElementById('gateTexto').textContent = texto ||
     ('Esta página é só a interface. O conteúdo da marca ' + m.nome +
@@ -1489,8 +1444,10 @@ function iniciar(){
   marcaSync(gh.ligado() ? 'busy' : '', gh.ligado() ? 'verificando' : 'local');
 }
 
-document.getElementById('gateBtn').onclick = abrirSync;
-document.getElementById('syncPill').onclick = abrirSync;
+document.getElementById('gateBtn').onclick = entrar;
+document.getElementById('btnSair').onclick = sair;
+document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key === 'Enter') entrar(); });
+document.getElementById('syncPill').onclick = abrirConta;
 ['selMarca','selMarcaGate'].forEach(id => {
   const sel = document.getElementById(id);
   if(sel) sel.onchange = e => trocarMarca(e.target.value);
@@ -1512,28 +1469,98 @@ window.addEventListener('beforeunload', e => {
 });
 
 async function boot(){
+  sb = sb || window.supabase.createClient(SB_URL, SB_KEY);
+  const {data:{session}} = await sb.auth.getSession();
+  if(!session){ sessao = null; mostrarLogin(); return; }
+  sessao = {email: session.user.email};
+
+  // O RLS decide o que aparece: quem nao esta em `membros` recebe lista vazia.
+  const [{data:ms, error:e1}, {data:ps, error:e2}] = await Promise.all([
+    sb.from('marcas').select('id,nome,ordem').order('ordem'),
+    sb.from('membros').select('marca_id,papel')
+  ]);
+  if(e1 || e2){ mostrarLogin('Não consegui carregar: ' + traduzErro(e1 || e2)); return; }
+  marcasLista = ms || [];
+  papeis = {};
+  (ps || []).forEach(r => { papeis[r.marca_id] = r.papel; });
+
+  if(!marcasLista.length){
+    mostrarSemAcesso();
+    return;
+  }
+  if(!marcaAtiva || !marcasLista.some(m => m.id === marcaAtiva)){
+    marcaAtiva = localStorage.getItem(CHAVE_BASE + ':ultima:' + sessao.email) || marcasLista[0].id;
+    if(!marcasLista.some(m => m.id === marcaAtiva)) marcaAtiva = marcasLista[0].id;
+  }
+  await carregarMarca();
+}
+
+/* Carrega a marca ativa: cache local primeiro para a tela nao piscar,
+   depois o que estiver no banco. */
+async function carregarMarca(){
+  localStorage.setItem(CHAVE_BASE + ':ultima:' + sessao.email, marcaAtiva);
   carregarLocal();
+  document.body.classList.toggle('leitura', !podeEditar());
   if(temConteudo()){
     iniciar();
-    if(gh.ligado()){
-      try{
-        if(await gh.puxar()){ renderTudo(); toast('Trouxe novidades do repositório'); }
-        if(pendente) await gh.enviar(); else marcaSync('ok','sincronizado');
-      }catch(e){ marcaSync('err', e.message); }
-    }
-    return;
-  }
-  if(gh.ligado()){
-    mostrarGate('Carregando o seu sistema...');
     try{
-      await gh.puxar();
-      if(temConteudo()){ iniciar(); return; }
-      mostrarGate('Conectado, mas não achei sistema.json com conteúdo nesse repositório.');
-    }catch(e){ mostrarGate('Não consegui carregar: ' + e.message); }
+      if(await gh.puxar()) renderTudo();
+      marcaSync(podeEditar() ? 'ok' : '', podeEditar() ? 'sincronizado' : 'somente leitura');
+    }catch(e){ marcaSync('err', e.message); }
     return;
   }
-  mostrarGate();
+  mostrarGate('Carregando ' + marcaAtual().nome + '...');
+  try{
+    await gh.puxar();
+    if(temConteudo()){ iniciar(); marcaSync(podeEditar() ? 'ok' : '', podeEditar() ? 'sincronizado' : 'somente leitura'); return; }
+    mostrarGate('A marca ' + marcaAtual().nome + ' ainda não tem conteúdo.');
+  }catch(e){ mostrarGate('Não consegui carregar: ' + e.message); }
 }
+
+function mostrarLogin(erro){
+  document.getElementById('app').hidden = true;
+  document.getElementById('gate').hidden = false;
+  document.getElementById('loginForm').hidden = false;
+  document.getElementById('gateTroca').hidden = true;
+  document.getElementById('btnSair').hidden = true;
+  document.getElementById('gateSub').textContent = 'agenda do grupo';
+  document.getElementById('gateTexto').textContent = erro ||
+    'Entre com o seu e-mail para ver as agendas que liberaram para você.';
+}
+
+function mostrarSemAcesso(){
+  document.getElementById('app').hidden = true;
+  document.getElementById('gate').hidden = false;
+  document.getElementById('loginForm').hidden = true;
+  document.getElementById('gateTroca').hidden = true;
+  document.getElementById('btnSair').hidden = false;
+  document.getElementById('gateSub').textContent = sessao.email;
+  document.getElementById('gateTexto').textContent =
+    'Você entrou, mas ainda não tem acesso liberado a nenhuma marca. ' +
+    'Peça para o Alan liberar o seu e-mail — não é erro da página.';
+}
+
+async function entrar(){
+  const el = document.getElementById('loginEmail');
+  const email = el.value.trim();
+  const dica = document.getElementById('loginDica');
+  if(!email || email.indexOf('@') < 1){ dica.textContent = 'Escreva um e-mail válido.'; return; }
+  dica.textContent = 'Enviando...';
+  const {error} = await sb.auth.signInWithOtp({
+    email, options:{emailRedirectTo: location.origin + location.pathname}
+  });
+  dica.textContent = error
+    ? 'Não deu certo: ' + traduzErro(error)
+    : 'Link enviado para ' + email + '. Abra o e-mail nesta mesma máquina.';
+}
+
+async function sair(){
+  if(pendente && gh.ligado()){ clearTimeout(syncTimer); try{ await gh.enviar(); }catch(e){} }
+  await sb.auth.signOut();
+  sessao = null; S = null; marcasLista = []; papeis = {}; marcaAtiva = null; pendente = false;
+  mostrarLogin();
+}
+
 boot();
 </script>
 </body>
