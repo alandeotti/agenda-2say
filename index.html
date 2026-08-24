@@ -57,6 +57,12 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
 .brand{display:flex;align-items:baseline;gap:10px;margin-right:auto}
 .brand h1{font-size:16px;color:var(--branco)}
 .brand .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--limao);font-family:'JetBrains Mono',monospace}
+.gate-troca{margin-top:16px;padding-top:14px;border-top:1px solid var(--linha);display:flex;align-items:center;gap:8px}
+.gate-troca label{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--cinza-claro)}
+#selMarcaGate{
+  font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--branco);
+  color:var(--grafite);border:1px solid var(--linha-forte);border-radius:4px;padding:4px 7px;cursor:pointer
+}
 #selMarca{
   font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
   background:rgba(255,255,255,.10);color:var(--branco);border:1px solid rgba(255,255,255,.22);
@@ -307,6 +313,10 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
         Conecte para carregar o seu sistema.
       </p>
       <button class="btn lima" id="gateBtn">Conectar</button>
+      <div class="gate-troca">
+        <label for="selMarcaGate">Ver outra marca</label>
+        <select id="selMarcaGate"></select>
+      </div>
     </div>
   </div>
 </div>
@@ -782,12 +792,14 @@ function renderMarca(){
 }
 
 function renderSeletorMarca(){
-  const sel = document.getElementById('selMarca');
-  if(!sel) return;
   const c = cfgGeral();
-  sel.innerHTML = c.marcas.map(m =>
+  const html = c.marcas.map(m =>
     `<option value="${esc(m.id)}" ${m.id===c.marcaAtiva?'selected':''}>${esc(m.nome)}${m.token&&m.repo?'':' ·'}</option>`
   ).join('');
+  ['selMarca','selMarcaGate'].forEach(id => {
+    const sel = document.getElementById(id);
+    if(sel) sel.innerHTML = html;
+  });
 }
 
 /* Troca de marca: garante que o que está pendente vá embora antes de
@@ -1451,6 +1463,7 @@ function mostrarGate(texto){
   document.getElementById('gate').hidden = false;
   const m = marcaAtual();
   document.getElementById('gateSub').textContent = m.nome + ' · conteúdo privado';
+  renderSeletorMarca();
   document.getElementById('gateTexto').textContent = texto ||
     ('Esta página é só a interface. O conteúdo da marca ' + m.nome +
      ' fica num repositório privado. Conecte para carregar.');
@@ -1468,7 +1481,10 @@ function iniciar(){
 
 document.getElementById('gateBtn').onclick = abrirSync;
 document.getElementById('syncPill').onclick = abrirSync;
-document.getElementById('selMarca').onchange = e => trocarMarca(e.target.value);
+['selMarca','selMarcaGate'].forEach(id => {
+  const sel = document.getElementById(id);
+  if(sel) sel.onchange = e => trocarMarca(e.target.value);
+});
 document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => trocaAba(b.dataset.aba));
 document.getElementById('wkPrev').onclick = () => { semanaAtual = deslocaSemana(semanaAtual,-1); render(); };
 document.getElementById('wkNext').onclick = () => { semanaAtual = deslocaSemana(semanaAtual, 1); render(); };
