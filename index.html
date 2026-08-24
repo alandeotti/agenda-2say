@@ -768,6 +768,7 @@ function ouvirMudancas(){
     .on('postgres_changes',
         {event:'UPDATE', schema:'public', table:'sistemas', filter:'marca_id=eq.' + marcaAtiva},
         payload => {
+          console.log('[agenda] chegou mudanca', payload && payload.eventType);
           const novo = payload && payload.new;
           if(!novo || !novo.dados || !novo.dados.guia) return;
           // O eco da propria gravacao nao interessa.
@@ -778,7 +779,9 @@ function ouvirMudancas(){
           const quem = (novo.atualizado_por || '').split('@')[0];
           toast((quem ? quem : 'Alguem') + ' acabou de mexer aqui');
         })
-    .subscribe();
+    .subscribe((status, err) => {
+      console.log('[agenda] canal', marcaAtiva, status, err || '');
+    });
 }
 
 /* Mensagem do Postgres nao serve para quem esta usando. */
