@@ -445,6 +445,7 @@ const CHAVE_BASE = '2say-sistema-v1';
 const SB_URL = 'https://uimmlosuexmpenbzwcak.supabase.co';
 const SB_KEY = 'sb_publishable_UrI0sU0Bk9xboaOHFSKz5g_HOsutTyu';
 let sb = null;
+let canal = null;   // assinatura de tempo real da marca ativa
 
 let sessao = null;        // { email } de quem esta logado
 let marcasLista = [];     // marcas que o RLS deixou esta pessoa ver
@@ -754,6 +755,31 @@ const gh = {
     return false;
   }
 };
+
+/* ---------------------------------------------------------------------
+   Tempo real. Uma assinatura por marca; ao trocar de marca, troca o canal.
+   O que chega passa pelo mesmo `mesclar` do envio — quem estiver com uma
+   edicao local ainda nao enviada nao a perde.
+   --------------------------------------------------------------------- */
+function ouvirMudancas(){
+  if(canal){ try{ sb.removeChannel(canal); }catch(e){} canal = null; }
+  if(!sb || !marcaAtiva) return;
+  canal = sb.channel('sistema-' + marcaAtiva)
+    .on('postgres_changes',
+        {event:'UPDATE', schema:'public', table:'sistemas', filter:'marca_id=eq.' + marcaAtiva},
+        payload => {
+          const novo = payload && payload.new;
+          if(!novo || !novo.dados || !novo.dados.guia) return;
+          // O eco da propria gravacao nao interessa.
+          if(novo.atualizado_por && sessao && novo.atualizado_por === sessao.email) return;
+          S = mesclar(S, novo.dados);
+          try{ localStorage.setItem(CHAVE(), JSON.stringify(S)); }catch(e){}
+          renderTudo();
+          const quem = (novo.atualizado_por || '').split('@')[0];
+          toast((quem ? quem : 'Alguem') + ' acabou de mexer aqui');
+        })
+    .subscribe();
+}
 
 /* Mensagem do Postgres nao serve para quem esta usando. */
 function traduzErro(e){
@@ -1519,12 +1545,13 @@ async function carregarMarca(){
       if(await gh.puxar()) renderTudo();
       marcaSync(podeEditar() ? 'ok' : '', podeEditar() ? 'sincronizado' : 'somente leitura');
     }catch(e){ marcaSync('err', e.message); }
+    ouvirMudancas();
     return;
   }
   mostrarGate('Carregando ' + marcaAtual().nome + '...');
   try{
     await gh.puxar();
-    if(temConteudo()){ iniciar(); marcaSync(podeEditar() ? 'ok' : '', podeEditar() ? 'sincronizado' : 'somente leitura'); return; }
+    if(temConteudo()){ iniciar(); marcaSync(podeEditar() ? 'ok' : '', podeEditar() ? 'sincronizado' : 'somente leitura'); ouvirMudancas(); return; }
     mostrarGate('A marca ' + marcaAtual().nome + ' ainda não tem conteúdo.');
   }catch(e){ mostrarGate('Não consegui carregar: ' + e.message); }
 }
@@ -1565,6 +1592,7 @@ async function entrar(){
 
 async function sair(){
   if(pendente && gh.ligado()){ clearTimeout(syncTimer); try{ await gh.enviar(); }catch(e){} }
+  if(canal){ try{ sb.removeChannel(canal); }catch(e){} canal = null; }
   await sb.auth.signOut();
   sessao = null; S = null; marcasLista = []; papeis = {}; marcaAtiva = null; pendente = false;
   mostrarLogin();
