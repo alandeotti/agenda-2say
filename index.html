@@ -767,19 +767,10 @@ const gh = {
    nao enviada continua protegida.
    --------------------------------------------------------------------- */
 let timerPoll = null;
-let pollLigado = 0;   // diagnostico: ouvirMudancas() rodou?
-let pollCiclos = 0;   // diagnostico: quantas conferencias completaram
-let pollMotivo = '-';  // diagnostico: em que guarda parou
 
 async function conferirNovidades(){
-  pollCiclos++;
-  pollMotivo = '?';
-  if(!sb)         { pollMotivo = 'sem-sb';     marcaDiag(); return; }
-  if(!marcaAtiva) { pollMotivo = 'sem-marca';  marcaDiag(); return; }
-  if(!sessao)     { pollMotivo = 'sem-sessao'; marcaDiag(); return; }
-  if(pendente)    { pollMotivo = 'pendente';   marcaDiag(); return; }
-  pollMotivo = 'ok';
-  marcaDiag();
+  if(!sb || !marcaAtiva || !sessao) return;
+  if(pendente) return;   // tenho edicao minha pra enviar antes
   try{
     if(await gh.puxar()){
       renderTudo();
@@ -799,14 +790,6 @@ function ouvirMudancas(){
   if(timerPoll){ clearInterval(timerPoll); timerPoll = null; }
   if(!sb || !marcaAtiva) return;
   timerPoll = setInterval(conferirNovidades, 20000);
-  pollLigado = 1;
-  marcaDiag();
-}
-
-/* Diagnostico no titulo da aba: [ligado/ciclos]. Some quando eu tirar. */
-function marcaDiag(){
-  const base = document.title.replace(/ \[[^\]]*\]$/, '');
-  document.title = base + ' [' + pollLigado + '/' + pollCiclos + '/' + pollMotivo + ']';
 }
 
 /* Voltou pra aba depois de um tempo fora: confere na hora, sem esperar o ciclo. */
