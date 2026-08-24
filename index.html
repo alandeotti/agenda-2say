@@ -59,6 +59,12 @@ input,textarea,select{font-family:inherit;font-size:inherit;color:inherit}
 .brand h1{font-size:16px;color:var(--branco)}
 .brand .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--limao);font-family:'JetBrains Mono',monospace}
 #loginForm .campo{margin-bottom:12px;text-align:left}
+.btn-google{
+  display:inline-flex;align-items:center;gap:9px;width:100%;justify-content:center;
+  background:var(--branco);color:#1F1F1F;border:1px solid var(--linha-forte);border-radius:4px;
+  padding:10px 14px;font-size:13.5px;font-weight:500;font-family:inherit;cursor:pointer
+}
+.btn-google:hover{background:#F7F9FA;border-color:var(--cinza-claro)}
 #loginForm input{width:100%;padding:9px 11px;border:1px solid var(--linha-forte);border-radius:4px;font:inherit;font-size:13px}
 #loginForm .dica{font-size:11px;color:var(--cinza-claro);margin-top:9px;line-height:1.45}
 body.leitura #btnNovaIdeia{display:none}
@@ -319,12 +325,16 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
         Conecte para carregar o seu sistema.
       </p>
       <div id="loginForm">
-        <div class="campo">
-          <label for="loginEmail">Seu e-mail</label>
-          <input id="loginEmail" type="email" autocomplete="email" placeholder="voce@empresa.com">
-        </div>
-        <button class="btn lima" id="gateBtn">Entrar</button>
-        <p class="dica" id="loginDica">Você recebe um link por e-mail. Não tem senha.</p>
+        <button class="btn-google" id="gateBtn">
+          <svg viewBox="0 0 48 48" width="17" height="17" aria-hidden="true">
+            <path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9 3.6l6.7-6.7C35.6 2.6 30.2 0 24 0 14.6 0 6.5 5.4 2.6 13.2l7.8 6.1C12.3 13.2 17.6 9.5 24 9.5z"/>
+            <path fill="#4285F4" d="M46.1 24.6c0-1.6-.1-3.2-.4-4.6H24v9.1h12.4c-.5 2.9-2.2 5.3-4.6 7l7.6 5.9c4.4-4.1 6.7-10.1 6.7-17.4z"/>
+            <path fill="#FBBC05" d="M10.4 28.7c-.5-1.5-.8-3-.8-4.7s.3-3.2.8-4.7l-7.8-6.1C1 16.4 0 20.1 0 24s1 7.6 2.6 10.8l7.8-6.1z"/>
+            <path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.6-5.9c-2.1 1.4-4.8 2.3-8.3 2.3-6.4 0-11.7-3.7-13.6-9.9l-7.8 6.1C6.5 42.6 14.6 48 24 48z"/>
+          </svg>
+          <span>Entrar com Google</span>
+        </button>
+        <p class="dica" id="loginDica">Sem senha. Você escolhe a conta no próprio Google.</p>
       </div>
       <div id="gateTroca" class="gate-troca" hidden>
         <label for="selMarcaGate">Ver outra marca</label>
@@ -1446,7 +1456,6 @@ function iniciar(){
 
 document.getElementById('gateBtn').onclick = entrar;
 document.getElementById('btnSair').onclick = sair;
-document.getElementById('loginEmail').addEventListener('keydown', e => { if(e.key === 'Enter') entrar(); });
 document.getElementById('syncPill').onclick = abrirConta;
 ['selMarca','selMarcaGate'].forEach(id => {
   const sel = document.getElementById(id);
@@ -1470,8 +1479,11 @@ window.addEventListener('beforeunload', e => {
 
 async function boot(){
   sb = sb || window.supabase.createClient(SB_URL, SB_KEY);
+  const hash = new URLSearchParams(location.hash.slice(1));
+  const erroUrl = hash.get('error_description') || hash.get('error');
+  if(erroUrl) history.replaceState(null, '', location.pathname);
   const {data:{session}} = await sb.auth.getSession();
-  if(!session){ sessao = null; mostrarLogin(); return; }
+  if(!session){ sessao = null; mostrarLogin(erroUrl ? 'Não deu certo: ' + erroUrl : null); return; }
   sessao = {email: session.user.email};
 
   // O RLS decide o que aparece: quem nao esta em `membros` recebe lista vazia.
@@ -1541,18 +1553,15 @@ function mostrarSemAcesso(){
 }
 
 async function entrar(){
-  const el = document.getElementById('loginEmail');
-  const email = el.value.trim();
   const dica = document.getElementById('loginDica');
-  if(!email || email.indexOf('@') < 1){ dica.textContent = 'Escreva um e-mail válido.'; return; }
-  dica.textContent = 'Enviando...';
-  const {error} = await sb.auth.signInWithOtp({
-    email, options:{emailRedirectTo: location.origin + location.pathname}
+  dica.textContent = 'Abrindo o Google...';
+  const {error} = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {redirectTo: location.origin + location.pathname}
   });
-  dica.textContent = error
-    ? 'Não deu certo: ' + traduzErro(error)
-    : 'Link enviado para ' + email + '. Abra o e-mail nesta mesma máquina.';
+  if(error) dica.textContent = 'Não deu certo: ' + traduzErro(error);
 }
+
 
 async function sair(){
   if(pendente && gh.ligado()){ clearTimeout(syncTimer); try{ await gh.enviar(); }catch(e){} }
