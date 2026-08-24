@@ -777,7 +777,14 @@ async function conferirNovidades(){
       renderTudo();
       toast('A agenda mudou — atualizei aqui');
     }
-  }catch(e){ /* erro de rede passageiro nao vira alarme */ }
+    // Carimbo do ultimo exito: se este relogio nao anda, a conferencia parou.
+    const hora = new Date().toTimeString().slice(0, 8);
+    marcaSync(podeEditar() ? 'ok' : '',
+              (podeEditar() ? 'sincronizado' : 'leitura') + ' · ' + hora);
+  }catch(e){
+    // Falhar em silencio foi o que escondeu o problema por horas. Nunca mais.
+    marcaSync('err', 'conferindo: ' + (e && e.message ? e.message : e));
+  }
 }
 
 function ouvirMudancas(){
