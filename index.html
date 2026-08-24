@@ -769,13 +769,18 @@ const gh = {
 let timerPoll = null;
 let pollLigado = 0;   // diagnostico: ouvirMudancas() rodou?
 let pollCiclos = 0;   // diagnostico: quantas conferencias completaram
+let pollMotivo = '-';  // diagnostico: em que guarda parou
 
 async function conferirNovidades(){
   pollCiclos++;
+  pollMotivo = '?';
+  if(!sb)         { pollMotivo = 'sem-sb';     marcaDiag(); return; }
+  if(!marcaAtiva) { pollMotivo = 'sem-marca';  marcaDiag(); return; }
+  if(!sessao)     { pollMotivo = 'sem-sessao'; marcaDiag(); return; }
+  if(document.visibilityState !== 'visible'){ pollMotivo = 'oculta'; marcaDiag(); return; }
+  if(pendente)    { pollMotivo = 'pendente';   marcaDiag(); return; }
+  pollMotivo = 'ok';
   marcaDiag();
-  if(!sb || !marcaAtiva || !sessao) return;
-  if(document.visibilityState !== 'visible') return;  // aba escondida nao precisa
-  if(pendente) return;                                 // tenho coisa minha pra enviar antes
   try{
     if(await gh.puxar()){
       renderTudo();
@@ -801,8 +806,8 @@ function ouvirMudancas(){
 
 /* Diagnostico no titulo da aba: [ligado/ciclos]. Some quando eu tirar. */
 function marcaDiag(){
-  const base = document.title.replace(/ \[\d+\/\d+\]$/, '');
-  document.title = base + ' [' + pollLigado + '/' + pollCiclos + ']';
+  const base = document.title.replace(/ \[[^\]]*\]$/, '');
+  document.title = base + ' [' + pollLigado + '/' + pollCiclos + '/' + pollMotivo + ']';
 }
 
 /* Voltou pra aba depois de um tempo fora: confere na hora, sem esperar o ciclo. */
