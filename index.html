@@ -437,9 +437,19 @@ function cfgGeral(){
   return c;
 }
 function gravaCfgGeral(c){ try{ localStorage.setItem(CHAVE_GH, JSON.stringify(c)); }catch(e){} }
+/* O token vale pelo repositório, não pela marca. Se duas marcas moram no mesmo
+   repo, a segunda aproveita o token da primeira em vez de pedir de novo. */
+function tokenDe(c, m){
+  if(m.token) return m.token;
+  if(!m.repo) return '';
+  const irma = c.marcas.find(x => x !== m && x.repo === m.repo && x.token);
+  return irma ? irma.token : '';
+}
 function marcaAtual(){
   const c = cfgGeral();
-  return c.marcas.find(m => m.id === c.marcaAtiva) || c.marcas[0];
+  const m = c.marcas.find(x => x.id === c.marcaAtiva) || c.marcas[0];
+  const t = tokenDe(c, m);
+  return t === m.token ? m : Object.assign({}, m, {token: t});
 }
 const CHAVE = () => CHAVE_BASE + ':' + marcaAtual().id;
 const DIAS = ['seg','ter','qua','qui','sex','sab','dom'];
@@ -794,7 +804,7 @@ function renderMarca(){
 function renderSeletorMarca(){
   const c = cfgGeral();
   const html = c.marcas.map(m =>
-    `<option value="${esc(m.id)}" ${m.id===c.marcaAtiva?'selected':''}>${esc(m.nome)}${m.token&&m.repo?'':' ·'}</option>`
+    `<option value="${esc(m.id)}" ${m.id===c.marcaAtiva?'selected':''}>${esc(m.nome)}${m.repo&&tokenDe(c,m)?'':' ·'}</option>`
   ).join('');
   ['selMarca','selMarcaGate'].forEach(id => {
     const sel = document.getElementById(id);
