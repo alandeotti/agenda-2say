@@ -778,10 +778,21 @@ const gh = {
    --------------------------------------------------------------------- */
 let timerPoll = null;
 let ultimoCarimbo = null;   // atualizado_em visto por ultimo
+let ultimaRetentativa = 0;  // ultimo reenvio automatico de edicao pendente
 
 async function conferirNovidades(){
   if(!sb || !marcaAtiva || !sessao) return;
-  if(pendente) return;   // tenho edicao minha pra enviar antes
+  if(pendente){
+    // Edicao minha esperando envio. Se o envio falhou (banco fora, rede caiu),
+    // ninguem mais tentava e a conferencia parava pra sempre. Reenvia a cada 15 s;
+    // o enviar() mescla com o banco antes de gravar, entao nao apaga nada.
+    if(Date.now() - ultimaRetentativa > 15000){
+      ultimaRetentativa = Date.now();
+      clearTimeout(syncTimer);
+      gh.enviar();
+    }
+    return;
+  }
   try{
     // Pergunta barata primeiro: so o carimbo, ~100 bytes. O sistema inteiro
     // tem ~10 KB — baixar isso a cada poucos segundos estouraria a cota.
