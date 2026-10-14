@@ -291,6 +291,15 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
 }
 .toast.on{opacity:1}
 
+/* ---------- report de bug / sugestão (canto) ---------- */
+.btn-report{
+  position:fixed;right:18px;bottom:18px;z-index:90;background:var(--grafite);color:var(--branco);
+  border:1px solid rgba(255,255,255,.15);border-radius:999px;padding:9px 15px;font-size:12px;font-weight:600;
+  box-shadow:0 6px 18px rgba(0,33,47,.25);display:flex;align-items:center;gap:7px
+}
+.btn-report:hover{background:#000}
+.btn-report b{color:var(--limao);font-weight:700}
+
 .rodape{
   background:var(--grafite);color:rgba(226,238,243,.55);padding:16px 24px;font-size:11px;
   font-family:'JetBrains Mono',monospace;display:flex;gap:14px;flex-wrap:wrap;align-items:center
@@ -430,6 +439,7 @@ td.n{font-family:'JetBrains Mono',monospace;font-size:11.5px;white-space:nowrap}
 </div>
 
 <div class="toast" id="toast"></div>
+<button class="btn-report" id="btnReport" hidden title="Achou um bug ou tem uma sugestão?"><b>!</b> Reportar</button>
 
 <script>
 /* =========================================================
@@ -1457,6 +1467,49 @@ function abrirConta(){
   o.querySelector('[data-sair]').onclick = () => { fecha(); sair(); };
 }
 
+/* Report de bug/sugestão. Vai para a tabela `reports`, separada de `sistemas`:
+   só insere, nunca lê nem altera agenda. Quem lê é o Alan, no painel do Supabase. */
+function abrirReport(){
+  if(!sessao){ toast('Entre com o Google para reportar'); return; }
+  const o = overlay(`
+    <div class="editor" style="max-width:460px">
+      <div class="editor-head"><h3>Reportar</h3><button class="fechar" data-x>&times;</button></div>
+      <div class="editor-body">
+        <div class="campo">
+          <label>É um</label>
+          <div class="radios">
+            <label><input type="radio" name="rTipo" value="bug" checked>Bug</label>
+            <label><input type="radio" name="rTipo" value="sugestao">Sugestão</label>
+          </div>
+        </div>
+        <div class="campo">
+          <label>O que aconteceu ou o que você sugere</label>
+          <textarea id="rTexto" rows="5" placeholder="Ex.: cliquei em Salvar no card de quinta e ele sumiu"></textarea>
+          <p class="dica">Vai junto: seu e-mail e a marca aberta${marcaAtiva ? ' (' + esc((marcaAtual()||{}).nome||marcaAtiva) + ')' : ''}.</p>
+        </div>
+      </div>
+      <div class="editor-foot">
+        <button class="btn lima" data-salvar>Enviar</button>
+        <button class="btn linha" data-x>Cancelar</button>
+      </div>
+    </div>`);
+  const enviar = o.querySelector('[data-salvar]');
+  enviar.onclick = async () => {
+    const texto = o.querySelector('#rTexto').value.trim();
+    if(texto.length < 3){ toast('Escreva o que aconteceu'); return; }
+    enviar.disabled = true; enviar.textContent = 'Enviando...';
+    const {error} = await sb.from('reports').insert({
+      email: sessao.email,
+      marca_id: marcaAtiva || null,
+      tipo: (o.querySelector('input[name=rTipo]:checked')||{}).value || 'bug',
+      texto: texto.slice(0, 4000),
+      navegador: navigator.userAgent.slice(0, 300)
+    });
+    if(error){ enviar.disabled = false; enviar.textContent = 'Enviar'; toast('Não enviou: ' + traduzErro(error)); return; }
+    fecha(); toast('Recebido, obrigado!');
+  };
+}
+
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('on');
@@ -1519,6 +1572,7 @@ document.getElementById('wkPrev').onclick = () => { semanaAtual = deslocaSemana(
 document.getElementById('wkNext').onclick = () => { semanaAtual = deslocaSemana(semanaAtual, 1); render(); };
 document.getElementById('wkHoje').onclick = () => { semanaAtual = isoSemana(new Date()); render(); };
 document.getElementById('btnNovaIdeia').onclick = () => abrirIdeia(null);
+document.getElementById('btnReport').onclick = abrirReport;
 document.getElementById('btnCopiarBanco').onclick = () =>
   copiar(S.ideias.map(i => `- ${i.tema}${i.hook?` | "${i.hook}"`:''}`).join('\n'), 'Banco copiado');
 document.getElementById('btnBriefing').onclick = () =>
@@ -1538,6 +1592,7 @@ async function boot(){
   const {data:{session}} = await sb.auth.getSession();
   if(!session){ sessao = null; mostrarLogin(erroUrl ? 'Não deu certo: ' + erroUrl : null); return; }
   sessao = {email: session.user.email};
+  document.getElementById('btnReport').hidden = false;
 
   // O RLS decide o que aparece: quem nao esta em `membros` recebe lista vazia.
   const [{data:ms, error:e1}, {data:ps, error:e2}] = await Promise.all([
@@ -1584,6 +1639,7 @@ async function carregarMarca(){
 }
 
 function mostrarLogin(erro){
+  document.getElementById('btnReport').hidden = true;
   document.getElementById('app').hidden = true;
   document.getElementById('gate').hidden = false;
   document.getElementById('loginForm').hidden = false;
