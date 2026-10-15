@@ -209,6 +209,7 @@ body.leitura .slot,body.leitura .story{cursor:default}
 }
 .st.publicado{background:var(--grafite);color:var(--limao);border-color:var(--grafite)}
 .st.gravar{background:var(--limao);border-color:var(--limao);color:var(--grafite)}
+.slot .resp{font-size:9px;color:var(--cinza);font-weight:600}
 .slot .alc{font-size:9px;color:var(--grafite);font-family:'JetBrains Mono',monospace;border:1px solid var(--grafite);border-radius:2px;padding:1px 4px}
 
 /* ---------- banco ---------- */
@@ -1068,6 +1069,7 @@ function cardHTML(c){
     <span class="slot-foot">
       <span class="st ${c.status||'ideia'}">${c.status||'ideia'}</span>
       ${c.alcance ? '<span class="alc">+1</span>' : ''}
+      ${c.resp ? `<span class="resp">→ ${esc(c.resp)}</span>` : ''}
     </span>
   </div>`;
 }
@@ -1259,6 +1261,11 @@ function abrirCard(dia, id){
           </div>
         </div>
         <div class="campo">
+          <label>Responsável</label>
+          <input id="fResp" list="lResp" value="${esc(s.resp||'')}" placeholder="Quem faz. Alan recebe aviso">
+          <datalist id="lResp">${[...new Set(['Alan', ...Object.values(S.semanas||{}).flatMap(w => Object.values(w.dias||{}).flat()).map(c => c.resp).filter(Boolean)])].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+        </div>
+        <div class="campo">
           <label class="checkline"><input type="checkbox" id="fAlcance" ${s.alcance?'checked':''}> Este é o +1 de alcance do dia</label>
         </div>
       </div>
@@ -1291,7 +1298,8 @@ function abrirCard(dia, id){
       hook:o.querySelector('#fHook').value.trim(),
       canal:o.querySelector('#fCanal').value,
       status:o.querySelector('#fStatus').value,
-      alcance:o.querySelector('#fAlcance').checked
+      alcance:o.querySelector('#fAlcance').checked,
+      resp:o.querySelector('#fResp').value.trim()
     };
     if(dados.alcance)
       semana(wkAlvo).dias[diaAlvo].forEach(x => { if(x.id !== cardId) x.alcance = false; });
