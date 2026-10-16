@@ -467,6 +467,31 @@ function marcaAtual(){
 }
 function podeEditar(){ return papeis[marcaAtiva] === 'editor'; }
 
+/* Responsável do card: e-mail de quem tem acesso à marca. A lista vem de
+   membros_da_marca() (security definer), porque o RLS só deixa cada um ler
+   a própria linha de `membros`. Card antigo com resp em texto ("Alan") segue valendo. */
+let membrosMarca = [];    // [{email, nome}] da marca ativa
+async function carregarMembros(){
+  const m = marcaAtiva;
+  const {data, error} = await sb.rpc('membros_da_marca', {p_marca: m});
+  if(m === marcaAtiva) membrosMarca = error ? [] : (data || []);
+}
+function nomeResp(r){
+  if(!r || !r.includes('@')) return r || '';
+  const m = membrosMarca.find(x => x.email === r.toLowerCase());
+  return m ? m.nome : r.split('@')[0];
+}
+function opcoesResp(atual){
+  const eu = ((sessao && sessao.email) || '').toLowerCase();
+  // eu sempre entro: se a função ainda não existir no banco, ao menos dá pra salvar
+  const lista = membrosMarca.some(x => x.email === eu) ? membrosMarca : [...membrosMarca, {email:eu, nome:eu.split('@')[0]}];
+  const sel = (atual || '').toLowerCase();
+  const antigo = atual && !lista.some(x => x.email === sel);
+  return '<option value="">escolha quem faz</option>' +
+    (antigo ? `<option value="${esc(atual)}" selected>${esc(atual)} (antigo)</option>` : '') +
+    lista.map(x => `<option value="${esc(x.email)}" ${x.email === sel ? 'selected' : ''}>${esc(x.nome)}</option>`).join('');
+}
+
 const CHAVE = () => CHAVE_BASE + ':' + ((sessao && sessao.email) || 'anon') + ':' + marcaAtiva;
 const DIAS = ['seg','ter','qua','qui','sex','sab','dom'];
 const DIAS_LONGO = {seg:'segunda',ter:'terça',qua:'quarta',qui:'quinta',sex:'sexta',sab:'sábado',dom:'domingo'};
@@ -738,16 +763,21 @@ const gh = {
     if(!podeEditar()){ pendente = false; marcaSync('', 'somente leitura'); return; }
     try{
       marcaSync('busy','enviando');
-      let remoto = null;
-      try{ remoto = await this.ler(); }catch(e){}
+      // Sem ler o banco antes, gravar por cima apagaria o que os outros fizeram.
+      // Erro aqui deixa `pendente` ligado e a conferencia tenta de novo em 15 s.
+      let remoto;
+      try{ remoto = await this.ler(); }catch(e){ throw new Error('lendo o banco: ' + e.message); }
       if(remoto && !remoto.novo && remoto.guia){
         S = mesclar(S, remoto);
         try{ localStorage.setItem(CHAVE(), JSON.stringify(S)); }catch(e){}
         renderTudo();
       }
-      const {error} = await sb.from('sistemas')
-        .update({dados: S}).eq('marca_id', marcaAtiva);
+      // RLS negando o update nao da erro: volta 0 linhas. Sem o select(),
+      // isso aparecia como "sincronizado" com nada gravado.
+      const {data, error} = await sb.from('sistemas')
+        .update({dados: S}).eq('marca_id', marcaAtiva).select('marca_id');
       if(error) throw new Error(traduzErro(error));
+      if(!data || !data.length) throw new Error('o banco não gravou: sem permissão de escrita nesta marca?');
       pendente = false;
       marcaSync('ok','sincronizado');
     }catch(e){ marcaSync('err', e.message); }
@@ -1069,7 +1099,7 @@ function cardHTML(c){
     <span class="slot-foot">
       <span class="st ${c.status||'ideia'}">${c.status||'ideia'}</span>
       ${c.alcance ? '<span class="alc">+1</span>' : ''}
-      ${c.resp ? `<span class="resp">→ ${esc(c.resp)}</span>` : ''}
+      ${c.resp ? `<span class="resp">→ ${esc(nomeResp(c.resp))}</span>` : ''}
     </span>
   </div>`;
 }
@@ -1262,8 +1292,8 @@ function abrirCard(dia, id){
         </div>
         <div class="campo">
           <label>Responsável</label>
-          <input id="fResp" list="lResp" value="${esc(s.resp||'')}" placeholder="Quem faz. Alan recebe aviso">
-          <datalist id="lResp">${[...new Set(['Alan', ...Object.values(S.semanas||{}).flatMap(w => Object.values(w.dias||{}).flat()).map(c => c.resp).filter(Boolean)])].map(n => `<option value="${esc(n)}">`).join('')}</datalist>
+          <select id="fResp">${opcoesResp(s.resp)}</select>
+          <p class="dica">Só aparece quem tem acesso a esta marca.</p>
         </div>
         <div class="campo">
           <label class="checkline"><input type="checkbox" id="fAlcance" ${s.alcance?'checked':''}> Este é o +1 de alcance do dia</label>
@@ -1287,6 +1317,7 @@ function abrirCard(dia, id){
   o.querySelector('[data-salvar]').onclick = () => {
     const tema = o.querySelector('#fTema').value.trim();
     if(!tema){ toast('Escreva o tema antes de salvar'); return; }
+    if(!o.querySelector('#fResp').value){ toast('Escolha o responsável'); return; }
     const q = qById(o.querySelector('input[name=q]:checked').value);
     const wkAlvo = o.querySelector('#fSemana').value;
     const diaAlvo = o.querySelector('#fDia').value;
@@ -1299,7 +1330,7 @@ function abrirCard(dia, id){
       canal:o.querySelector('#fCanal').value,
       status:o.querySelector('#fStatus').value,
       alcance:o.querySelector('#fAlcance').checked,
-      resp:o.querySelector('#fResp').value.trim()
+      resp:o.querySelector('#fResp').value
     };
     if(dados.alcance)
       semana(wkAlvo).dias[diaAlvo].forEach(x => { if(x.id !== cardId) x.alcance = false; });
@@ -1393,6 +1424,7 @@ function agendarIdeia(id){
           <div class="campo"><label>Nível</label>
             <select id="aNivel">${NKEYS().map(n => `<option value="${n}" ${n===nivelPad?'selected':''}>${esc(NIVEIS()[n].nome)}</option>`).join('')}</select></div>
         </div>
+        <div class="campo"><label>Responsável</label><select id="aResp">${opcoesResp('')}</select></div>
         <p class="dica">Entra como card novo na ${DIAS_LONGO.seg ? 'semana ' + semanaAtual.replace('-W',' sem ') : ''}, junto do que já estiver no dia.</p>
       </div>
       <div class="editor-foot">
@@ -1403,13 +1435,15 @@ function agendarIdeia(id){
   o.querySelector('[data-salvar]').onclick = () => {
     const dia = o.querySelector('#aDia').value;
     const nivel = o.querySelector('#aNivel').value;
+    const resp = o.querySelector('#aResp').value;
+    if(!resp){ toast('Escolha o responsável'); return; }
     const qq = qById(i.quadro) || QUADROS().find(x => x.nivel === nivel);
     if(!qq){ toast('Sem quadro para esse nível'); return; }
     migra(S);
     S.removidos.ideias[id] = agora();
     S.ideias = S.ideias.filter(x => x.id !== id);
     gravaCard(semanaAtual, dia, 'c' + Date.now() + Math.random().toString(36).slice(2,6),
-      {quadro:qq.id, nivel:qq.nivel, tema:i.tema, hook:i.hook||'', canal:(qq.canais||[])[0]||'', status:'ideia', alcance:false});
+      {quadro:qq.id, nivel:qq.nivel, tema:i.tema, hook:i.hook||'', canal:(qq.canais||[])[0]||'', status:'ideia', alcance:false, resp});
     fecha();
     toast('Foi para ' + DIAS_LONGO[dia]);
   };
@@ -1638,6 +1672,8 @@ async function boot(){
    depois o que estiver no banco. */
 async function carregarMarca(){
   localStorage.setItem(CHAVE_BASE + ':ultima:' + sessao.email, marcaAtiva);
+  membrosMarca = [];
+  carregarMembros().then(render, () => {});   // nomes curtos nos cards quando chegar
   carregarLocal();
   document.body.classList.toggle('leitura', !podeEditar());
   if(temConteudo()){
