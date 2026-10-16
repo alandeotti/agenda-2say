@@ -229,6 +229,12 @@ body.leitura .slot,body.leitura .story{cursor:default}
 .ideia .acoes{display:flex;gap:5px;flex:none}
 .ic{border:1px solid var(--linha-forte);border-radius:3px;padding:4px 8px;font-size:11px;color:var(--cinza)}
 .ic:hover{border-color:var(--grafite);color:var(--grafite)}
+a.chip.lk,button.chip.lk{display:inline-flex;align-items:center;gap:5px;text-decoration:none;color:var(--grafite);background:var(--branco);cursor:pointer}
+.chip.lk:hover{border-color:var(--grafite)}
+.chip.lk img{height:16px;width:auto;border-radius:2px;display:block}
+.anexos{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px}
+.anexos .anx{display:inline-flex;gap:2px;align-items:center}
+.anexos .ic{padding:1px 6px}
 .vazio-msg{border:1px dashed var(--linha-forte);border-radius:5px;padding:26px;text-align:center;color:var(--cinza-claro);font-size:13px}
 
 /* ---------- histórico ---------- */
@@ -490,6 +496,113 @@ function opcoesResp(atual){
   return '<option value="">escolha quem faz</option>' +
     (antigo ? `<option value="${esc(atual)}" selected>${esc(atual)} (antigo)</option>` : '') +
     lista.map(x => `<option value="${esc(x.email)}" ${x.email === sel ? 'selected' : ''}>${esc(x.nome)}</option>`).join('');
+}
+
+/* Links e anexos de ideia e card. O conteúdo vem de outras pessoas: link só
+   http(s), tudo escapado. Anexo mora no Storage (bucket privado, pasta da marca,
+   policies em _anexos.sql); no JSON fica só {nome, caminho, tamanho}. */
+const BUCKET = 'anexos';
+const TIPOS_ANEXO = {doc:'application/msword', txt:'text/plain',
+  docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'};
+const MAX_ANEXO = 10 * 1024 * 1024;
+function linkOk(u){
+  try{ const x = new URL(String(u).trim()); return /^https?:$/.test(x.protocol) ? x.href : ''; }
+  catch(e){ return ''; }
+}
+function dominio(h, d){ return h === d || h.endsWith('.' + d); }
+function plataforma(u){
+  const h = new URL(u).hostname.toLowerCase();
+  if(dominio(h, 'instagram.com')) return 'Reels';
+  if(dominio(h, 'youtube.com') || dominio(h, 'youtu.be')) return 'YouTube';
+  if(dominio(h, 'tiktok.com')) return 'TikTok';
+  return 'Link';
+}
+function ytId(u){
+  const x = new URL(u);
+  const id = dominio(x.hostname, 'youtu.be') ? x.pathname.slice(1)
+    : x.searchParams.get('v') || (x.pathname.match(/^\/(?:shorts|embed|live)\/([^/]+)/) || [])[1];
+  return /^[\w-]{11}$/.test(id || '') ? id : '';
+}
+function linksHTML(links){
+  return (links || []).map(linkOk).filter(Boolean).map(u => {
+    const p = plataforma(u), yt = p === 'YouTube' && ytId(u);
+    return `<a class="chip lk" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(u)}">` +
+      (yt ? `<img src="https://img.youtube.com/vi/${yt}/default.jpg" alt="" loading="lazy">` : '') + p + '</a>';
+  }).join('');
+}
+const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1024)) + ' KB';
+function anexosHTML(anexos, comTirar){
+  return (anexos || []).map((a, k) => `<span class="anx"><button class="chip lk" data-baixa="${esc(a.caminho)}" data-nome="${esc(a.nome)}" title="Baixar">📎 ${esc(a.nome)} · ${kb(a.tamanho)}</button>` +
+    (comTirar ? `<button class="ic" data-tira="${k}" title="Tirar e apagar o arquivo">&times;</button>` : '') + '</span>').join('');
+}
+function erroAnexo(e){
+  const m = (e && e.message) || '';
+  return /bucket not found/i.test(m) ? 'Anexos ainda não ativados no banco (falta rodar o _anexos.sql)' : 'Anexo: ' + traduzErro(e);
+}
+function ligaBaixar(raiz){
+  raiz.querySelectorAll('[data-baixa]').forEach(b => b.onclick = async e => {
+    e.stopPropagation();
+    const {data, error} = await sb.storage.from(BUCKET).createSignedUrl(b.dataset.baixa, 60, {download: b.dataset.nome});
+    if(error){ toast(erroAnexo(error)); return; }
+    // iframe e não location: navegar dispararia o beforeunload da edição pendente
+    const f = document.createElement('iframe');
+    f.hidden = true; f.src = data.signedUrl; document.body.appendChild(f);
+    setTimeout(() => f.remove(), 60000);
+  });
+}
+async function enviarAnexo(file, dono){
+  const ext = ((file.name.match(/\.(\w+)$/) || [])[1] || '').toLowerCase();
+  if(!TIPOS_ANEXO[ext]) throw new Error('Só Word ou txt (.doc, .docx, .txt)');
+  if(file.size > MAX_ANEXO) throw new Error('Passa de 10 MB');
+  const limpo = file.name.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\w.-]+/g, '_');
+  const caminho = `${marcaAtiva}/${dono}/${Date.now()}-${limpo}`;
+  const {error} = await sb.storage.from(BUCKET).upload(caminho, file, {contentType: TIPOS_ANEXO[ext]});
+  if(error) throw new Error(erroAnexo(error));
+  return {nome: file.name, caminho, tamanho: file.size};
+}
+function apagaArquivos(anexos){
+  const cs = (anexos || []).map(a => a.caminho).filter(Boolean);
+  if(cs.length) sb.storage.from(BUCKET).remove(cs).then(({error}) => { if(error) toast(erroAnexo(error)); });
+}
+const camposExtras = item => `
+  <div class="campo"><label>Links de referência</label>
+    <textarea id="xLinks" placeholder="Um por linha: Reels, YouTube, TikTok ou qualquer endereço">${esc((item.links || []).join('\n'))}</textarea>
+  </div>
+  <div class="campo"><label>Anexos (roteiro em Word ou txt, até 10 MB)</label>
+    <div class="anexos" id="xAnexos"></div>
+    <input type="file" id="xArquivo" accept=".doc,.docx,.txt">
+    <p class="dica" id="xAviso"></p>
+  </div>`;
+/* Liga links e anexos num editor aberto. Devolve a função que o Salvar chama:
+   null se algo impede salvar, senão {links, anexos}. Cancelar apaga o que subiu agora. */
+function ligaExtras(o, dono, item){
+  let anexos = (item.anexos || []).slice(), enviando = false;
+  const novos = [], tirados = [];
+  const box = o.querySelector('#xAnexos'), aviso = o.querySelector('#xAviso'), input = o.querySelector('#xArquivo');
+  const desenha = () => {
+    box.innerHTML = anexosHTML(anexos, true);
+    ligaBaixar(box);
+    box.querySelectorAll('[data-tira]').forEach(b => b.onclick = () => { tirados.push(...anexos.splice(+b.dataset.tira, 1)); desenha(); });
+  };
+  desenha();
+  input.onchange = async () => {
+    const f = input.files[0]; input.value = '';
+    if(!f) return;
+    enviando = true; aviso.textContent = 'Enviando ' + f.name + '...';
+    try{ const a = await enviarAnexo(f, dono); novos.push(a); anexos.push(a); aviso.textContent = ''; desenha(); }
+    catch(e){ aviso.textContent = e.message; }
+    enviando = false;
+  };
+  o.aoFechar = () => apagaArquivos(novos);
+  return () => {
+    if(enviando){ toast('Espere o anexo terminar de subir'); return null; }
+    const linhas = o.querySelector('#xLinks').value.split('\n').map(s => s.trim()).filter(Boolean);
+    const ruim = linhas.find(l => !linkOk(l));
+    if(ruim){ toast('Link inválido (só http ou https): ' + ruim.slice(0, 60)); return null; }
+    o.aoFechar = null;
+    apagaArquivos(tirados);
+    return {links: linhas.map(linkOk), anexos};
+  };
 }
 
 const CHAVE = () => CHAVE_BASE + ':' + ((sessao && sessao.email) || 'anon') + ':' + marcaAtiva;
@@ -1181,13 +1294,15 @@ function renderBanco(){
           ${id.formato ? `<span class="chip">${esc(id.formato)}</span>` : ''}
           ${q ? `<span class="chip">${esc(q.nome)}</span><span class="chip">${esc(NIVEIS()[q.nivel].nome)}</span>` : ''}
         </div>
+        ${(id.links||[]).length || (id.anexos||[]).length ? `<div class="meta">${linksHTML(id.links)}${anexosHTML(id.anexos)}</div>` : ''}
       </div>
       <div class="acoes">
-        <button class="ic" data-edita="${id.id}">editar</button>
-        <button class="ic" data-agenda="${id.id}">agendar</button>
+        <button class="ic" data-edita="${esc(id.id)}">editar</button>
+        <button class="ic" data-agenda="${esc(id.id)}">agendar</button>
       </div>
     </div>`;
   }).join('');
+  ligaBaixar(alvo);
   alvo.querySelectorAll('[data-edita]').forEach(b => b.onclick = () => abrirIdeia(b.dataset.edita));
   alvo.querySelectorAll('[data-agenda]').forEach(b => b.onclick = () => agendarIdeia(b.dataset.agenda));
 }
@@ -1234,7 +1349,7 @@ function overlay(html){
   o.querySelectorAll('[data-x]').forEach(b => b.onclick = fecha);
   return o;
 }
-function fecha(){ document.querySelectorAll('.overlay').forEach(o => o.remove()); }
+function fecha(){ document.querySelectorAll('.overlay').forEach(o => { if(o.aoFechar) o.aoFechar(); o.remove(); }); }
 
 function abrirCard(dia, id){
   if(!podeEditar()){ toast('Você tem acesso de leitura nesta marca'); return; }
@@ -1290,6 +1405,7 @@ function abrirCard(dia, id){
             <select id="fDia">${DIAS.map(d => `<option value="${d}" ${d===dia?'selected':''}>${DIAS_LONGO[d]}</option>`).join('')}</select>
           </div>
         </div>
+        ${camposExtras(s)}
         <div class="campo">
           <label>Responsável</label>
           <select id="fResp">${opcoesResp(s.resp)}</select>
@@ -1313,6 +1429,8 @@ function abrirCard(dia, id){
   };
   o.querySelectorAll('input[name=q]').forEach(r => r.onchange = atualiza);
   atualiza();
+  const cardId = id || ('c' + Date.now() + Math.random().toString(36).slice(2,6));
+  const extras = ligaExtras(o, cardId, s);
 
   o.querySelector('[data-salvar]').onclick = () => {
     const tema = o.querySelector('#fTema').value.trim();
@@ -1321,8 +1439,10 @@ function abrirCard(dia, id){
     const q = qById(o.querySelector('input[name=q]:checked').value);
     const wkAlvo = o.querySelector('#fSemana').value;
     const diaAlvo = o.querySelector('#fDia').value;
-    const cardId = id || ('c' + Date.now() + Math.random().toString(36).slice(2,6));
+    const ex = extras();
+    if(!ex) return;
     const dados = {
+      ...ex,
       quadro:q.id,
       nivel:q.nivel,
       tema,
@@ -1342,7 +1462,7 @@ function abrirCard(dia, id){
     if(wkAlvo !== semanaAtual) toast('Foi para ' + DIAS_LONGO[diaAlvo] + ' da ' + wkAlvo.replace('-W',' sem '));
   };
   const del = o.querySelector('[data-apaga]');
-  if(del) del.onclick = () => { gravaCard(null, null, id, null); fecha(); };
+  if(del) del.onclick = () => { apagaArquivos(s.anexos); gravaCard(null, null, id, null); fecha(); };
   o.querySelector('#fTema').focus();
 }
 
@@ -1377,6 +1497,7 @@ function abrirIdeia(id){
             <select id="iQuadro"><option value="">a decidir</option>${QUADROS().map(q => `<option value="${q.id}" ${i.quadro===q.id?'selected':''}>${esc(NIVEIS()[q.nivel].nome)} · ${esc(q.nome)}</option>`).join('')}</select>
           </div>
         </div>
+        ${camposExtras(i)}
       </div>
       <div class="editor-foot">
         <button class="btn lima" data-salvar>Salvar</button>
@@ -1384,10 +1505,15 @@ function abrirIdeia(id){
         ${id ? '<button class="btn-del" data-apaga>Excluir</button>' : ''}
       </div>
     </div>`);
+  const iid = id || ('i' + Date.now());
+  const extras = ligaExtras(o, iid, i);
   o.querySelector('[data-salvar]').onclick = () => {
     const tema = o.querySelector('#iTema').value.trim();
     if(!tema){ toast('Escreva o tema'); return; }
+    const ex = extras();
+    if(!ex) return;
     const dados = {
+      ...ex,
       tema,
       hook:o.querySelector('#iHook').value.trim(),
       intencao:(o.querySelector('input[name=int]:checked')||{}).value||'',
@@ -1395,11 +1521,12 @@ function abrirIdeia(id){
       quadro:o.querySelector('#iQuadro').value
     };
     if(id) Object.assign(S.ideias.find(x => x.id === id), dados, {mod:agora()});
-    else S.ideias.unshift({id:'i'+Date.now(), criadoEm:agora(), mod:agora(), ...dados});
+    else S.ideias.unshift({id:iid, criadoEm:agora(), mod:agora(), ...dados});
     salvar(); fecha();
   };
   const del = o.querySelector('[data-apaga]');
   if(del) del.onclick = () => {
+    apagaArquivos(i.anexos);
     S.removidos = S.removidos || {slots:{}, ideias:{}};
     S.removidos.ideias[id] = agora();
     S.ideias = S.ideias.filter(x => x.id !== id);
@@ -1443,7 +1570,8 @@ function agendarIdeia(id){
     S.removidos.ideias[id] = agora();
     S.ideias = S.ideias.filter(x => x.id !== id);
     gravaCard(semanaAtual, dia, 'c' + Date.now() + Math.random().toString(36).slice(2,6),
-      {quadro:qq.id, nivel:qq.nivel, tema:i.tema, hook:i.hook||'', canal:(qq.canais||[])[0]||'', status:'ideia', alcance:false, resp});
+      {quadro:qq.id, nivel:qq.nivel, tema:i.tema, hook:i.hook||'', canal:(qq.canais||[])[0]||'', status:'ideia', alcance:false, resp,
+       links:i.links||[], anexos:i.anexos||[]});
     fecha();
     toast('Foi para ' + DIAS_LONGO[dia]);
   };
